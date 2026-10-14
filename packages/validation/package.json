@@ -1,0 +1,11 @@
+{
+  "name": "@nova/validation",
+  "version": "0.1.0",
+  "private": true,
+  "exports": {
+    ".": "./lead.ts"
+  },
+  "dependencies": {
+    "zod": "^4.1.0"
+  }
+}

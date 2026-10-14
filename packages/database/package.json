@@ -1,0 +1,13 @@
+{
+  "name": "@nova/database",
+  "version": "0.1.0",
+  "private": true,
+  "exports": {
+    ".": "./index.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "^7.10.0",
+    "@prisma/adapter-pg": "^7.10.0",
+    "pg": "^8.23.1"
+  }
+}

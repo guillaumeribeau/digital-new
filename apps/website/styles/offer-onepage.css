@@ -1,0 +1,339 @@
+.offer-onepage {
+  padding: 30px 0 80px;
+  overflow: clip;
+}
+.offer-onepage-grid {
+  display: grid;
+  grid-template-columns: 1.08fr 1fr;
+  gap: 85px;
+  align-items: center;
+}
+.offer-onepage-visual {
+  background: #dce5eb;
+  border: 1px solid #c9d7df;
+  padding: 25px;
+  min-width: 0;
+  position: relative;
+}
+.offer-onepage-visual-label {
+  display: flex;
+  justify-content: space-between;
+  gap: 15px;
+  font-size: 8px;
+  letter-spacing: 0.11em;
+  font-weight: 500;
+  color: #4c606e;
+}
+.offer-onepage-composition {
+  position: relative;
+  padding: 55px 10px 75px 0;
+}
+.offer-onepage-desktop {
+  display: block;
+  width: 95%;
+  transform: rotate(-3deg);
+  box-shadow: 0 20px 35px #253e5226;
+  transition: transform 0.35s;
+  background: white;
+}
+.offer-onepage-desktop img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+.offer-onepage-desktop:hover {
+  transform: rotate(-1deg) translateY(-4px);
+}
+.offer-onepage-mobile {
+  position: absolute;
+  right: 0;
+  bottom: 20px;
+  width: 25%;
+  border: 5px solid #233a46;
+  border-radius: 20px;
+  overflow: hidden;
+  transform: rotate(7deg);
+  box-shadow: 0 15px 25px #21374230;
+  background: #233a46;
+}
+.offer-onepage-mobile img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+.offer-onepage-note {
+  position: absolute;
+  left: -40px;
+  bottom: 23px;
+  background: var(--yellow);
+  padding: 16px 35px 16px 19px;
+  font-size: 11px;
+  line-height: 1.8;
+  transform: rotate(-5deg);
+  box-shadow: 0 6px 15px #2d44551a;
+}
+.offer-onepage-note svg {
+  position: absolute;
+  top: 12px;
+  right: 10px;
+}
+.offer-onepage-caption {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 15px;
+  padding: 19px 0;
+  border-top: 1px solid #71879250;
+}
+.offer-onepage-caption > div > span {
+  font-size: 8px;
+  letter-spacing: 0.06em;
+  color: #4c606e;
+}
+.offer-onepage-caption p {
+  font-family: var(--display);
+  font-size: 22px;
+  letter-spacing: -0.7px;
+  line-height: 1.2;
+  font-weight: 500;
+  margin: 6px 0 0;
+}
+.offer-onepage-caption > a {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border: 1px solid #71879280;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.offer-onepage-caption > a:hover {
+  background: var(--yellow);
+}
+.offer-onepage-disclaimer {
+  font-size: 9px;
+  color: #4c606e;
+  line-height: 1.8;
+  border-top: 1px solid #71879250;
+  padding-top: 13px;
+  margin: 0;
+}
+.offer-onepage-copy .eyebrow {
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  margin-bottom: 24px;
+}
+.offer-onepage-copy h2 {
+  font-size: clamp(38px, 3.9vw, 57px);
+  letter-spacing: -2.7px;
+  line-height: 1.08;
+  margin-bottom: 25px;
+}
+.offer-onepage-copy h2 > span {
+  color: var(--blue);
+}
+.offer-onepage-lead {
+  font-size: 17px;
+  line-height: 1.65;
+  margin-bottom: 18px;
+  max-width: 420px;
+}
+.offer-onepage-description {
+  font-size: 13px;
+  line-height: 1.9;
+  color: var(--muted);
+  margin-bottom: 25px;
+  max-width: 420px;
+}
+.offer-onepage-content > div {
+  display: flex;
+  gap: 17px;
+  border-top: 1px solid var(--line);
+  padding: 17px 0;
+}
+.offer-onepage-content > div:last-child {
+  border-bottom: 1px solid var(--line);
+}
+.offer-onepage-content > div > span {
+  font-size: 9px;
+  color: var(--blue);
+  margin-top: 5px;
+}
+.offer-onepage-content h3 {
+  font-size: 18px;
+  letter-spacing: -0.4px;
+  line-height: 1.3;
+  margin: 0 0 6px;
+}
+.offer-onepage-content p {
+  font-size: 11px;
+  line-height: 1.8;
+  color: var(--muted);
+  margin: 0;
+}
+.offer-onepage-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 16px;
+  font-size: 12px;
+  font-weight: 600;
+  border-bottom: 1px solid currentColor;
+  padding-bottom: 7px;
+  margin-top: 26px;
+}
+.offer-onepage-link:hover {
+  color: var(--blue);
+}
+@media (max-width: 1100px) {
+  .offer-onepage-grid {
+    gap: 50px;
+    grid-template-columns: 1fr 1fr;
+  }
+  .offer-onepage-visual {
+    padding: 20px;
+  }
+  .offer-onepage-visual-label {
+    font-size: 7px;
+  }
+  .offer-onepage-visual-label > span:last-child {
+    display: none;
+  }
+  .offer-onepage-caption p {
+    font-size: 19px;
+  }
+  .offer-onepage-note {
+    font-size: 10px;
+    left: -29px;
+    padding: 13px 30px 13px 14px;
+  }
+  .offer-onepage-copy h2 {
+    font-size: 43px;
+    letter-spacing: -2px;
+  }
+}
+@media (min-width: 768px) and (max-width: 900px) {
+  .offer-onepage-grid {
+    grid-template-columns: 1fr;
+    gap: 45px;
+  }
+  .offer-onepage-visual {
+    max-width: 700px;
+    width: 100%;
+    margin: auto;
+  }
+  .offer-onepage-composition {
+    padding: 45px 60px 65px 15px;
+  }
+  .offer-onepage-desktop {
+    width: 90%;
+  }
+  .offer-onepage-mobile {
+    width: 21%;
+    right: 25px;
+  }
+  .offer-onepage-note {
+    left: 0;
+  }
+  .offer-onepage-copy {
+    max-width: 700px;
+    width: 100%;
+    margin: auto;
+  }
+  .offer-onepage-copy h2 {
+    font-size: 53px;
+  }
+  .offer-onepage-lead,
+  .offer-onepage-description {
+    max-width: 560px;
+  }
+}
+@media (max-width: 767px) {
+  .offer-onepage {
+    padding: 5px 0 45px;
+  }
+  .offer-onepage-grid {
+    grid-template-columns: 1fr;
+    gap: 35px;
+  }
+  .offer-onepage-visual {
+    padding: 18px 16px;
+  }
+  .offer-onepage-composition {
+    padding: 35px 10px 60px 2px;
+  }
+  .offer-onepage-mobile {
+    width: 26%;
+    right: 0;
+    bottom: 16px;
+    border-width: 4px;
+    border-radius: 14px;
+  }
+  .offer-onepage-note {
+    left: -22px;
+    bottom: 15px;
+    font-size: 8px;
+    padding: 12px 27px 12px 13px;
+  }
+  .offer-onepage-note svg {
+    width: 15px;
+    right: 7px;
+    top: 9px;
+  }
+  .offer-onepage-caption {
+    padding: 15px 0;
+  }
+  .offer-onepage-caption p {
+    font-size: 20px;
+  }
+  .offer-onepage-caption > div > span {
+    font-size: 7px;
+  }
+  .offer-onepage-caption > a {
+    width: 36px;
+    height: 36px;
+  }
+  .offer-onepage-disclaimer {
+    font-size: 8px;
+    padding-top: 12px;
+  }
+  .offer-onepage-copy .eyebrow {
+    font-size: 8px;
+    margin-bottom: 21px;
+  }
+  .offer-onepage-copy h2 {
+    font-size: 40px;
+    letter-spacing: -2px;
+    line-height: 1.1;
+    margin-bottom: 22px;
+  }
+  .offer-onepage-lead {
+    font-size: 16px;
+    line-height: 1.7;
+  }
+  .offer-onepage-description {
+    font-size: 12px;
+  }
+  .offer-onepage-content > div {
+    gap: 14px;
+    padding: 17px 0;
+  }
+  .offer-onepage-content h3 {
+    font-size: 19px;
+  }
+  .offer-onepage-content p {
+    font-size: 11px;
+  }
+  .offer-onepage-link {
+    font-size: 11px;
+    margin-top: 23px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .offer-onepage-desktop {
+    transition: none;
+  }
+  .offer-onepage-desktop:hover {
+    transform: rotate(-3deg);
+  }
+}

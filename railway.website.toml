@@ -1,0 +1,11 @@
+[build]
+builder = "RAILPACK"
+buildCommand = "npm run build:website"
+watchPatterns = ["/apps/website/**", "/packages/**", "/package.json", "/package-lock.json", "/prisma.config.ts", "/railway.website.toml"]
+
+[deploy]
+startCommand = "npm run start -- --hostname 0.0.0.0"
+healthcheckPath = "/"
+healthcheckTimeout = 120
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 5

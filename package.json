@@ -1,0 +1,87 @@
+{
+  "name": "nova-platform",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "version": "0.1.0",
+  "private": true,
+  "engines": {
+    "node": "22.x"
+  },
+  "scripts": {
+    "dev": "next dev apps/website",
+    "dev:admin": "next dev apps/admin --port 3001",
+    "build": "prisma generate && npm run build --workspaces --if-present",
+    "build:website": "prisma generate && npm run build --workspace @nova/website",
+    "build:admin": "prisma generate && npm run build --workspace @nova/admin",
+    "postinstall": "prisma generate",
+    "db:generate": "prisma generate",
+    "db:validate": "prisma validate",
+    "db:migrate:deploy": "prisma migrate deploy",
+    "db:setup:local": "tsx scripts/setup-local-db.ts",
+    "commercial:setup:local": "tsx scripts/configure-commercial-local.ts",
+    "outbox:once": "tsx scripts/process-outbox.ts",
+    "outbox:watch": "tsx scripts/process-outbox.ts --watch",
+    "emails:local": "tsx scripts/open-local-emails.ts",
+    "start": "next start apps/website",
+    "start:admin": "next start apps/admin",
+    "admin:create": "tsx scripts/create-admin.ts",
+    "admin:create:gui": "powershell.exe -NoProfile -STA -WindowStyle Hidden -ExecutionPolicy Bypass -File scripts/create-admin-gui.ps1",
+    "admin:manage": "tsx scripts/manage-admin.ts",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test tests/*.test.ts",
+    "test:integration": "tsx scripts/test-lead-pipeline.ts",
+    "test:admin-ui": "tsx scripts/test-lead-pipeline.ts --ui",
+    "test:commercial-ui": "tsx scripts/test-lead-pipeline.ts --commercial-ui",
+    "test:lead-ui": "node scripts/check-lead-form.mjs",
+    "test:verification-ui": "node scripts/check-lead-verification.mjs",
+    "test:ui": "node scripts/qa.mjs",
+    "examples:capture": "node scripts/capture-examples.mjs",
+    "examples:check": "node scripts/check-examples-gallery.mjs"
+  },
+  "dependencies": {
+    "@hookform/resolvers": "^5.2.2",
+    "@next/env": "^16.4.0",
+    "@pdf-lib/fontkit": "^1.1.1",
+    "@prisma/adapter-pg": "^7.10.0",
+    "@prisma/client": "^7.10.0",
+    "better-auth": "^1.7.7",
+    "gsap": "^3.14.2",
+    "lucide-react": "1.54.0",
+    "next": "16.4.0",
+    "pdf-lib": "^1.17.1",
+    "pg": "^8.23.1",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "react-hook-form": "^7.62.0",
+    "resend": "^6.32.1",
+    "stripe": "^23.0.0",
+    "tsx": "^4.20.0",
+    "zod": "^4.1.0"
+  },
+  "overrides": {
+    "prisma": {
+      "mysql2": "3.24.5"
+    },
+    "@prisma/config": {
+      "deepmerge-ts": "8.0.2"
+    }
+  },
+  "devDependencies": {
+    "@playwright/test": "1.64.0",
+    "@tailwindcss/postcss": "^4.1.0",
+    "@types/node": "^22.0.0",
+    "@types/pg": "^8.23.1",
+    "@types/qrcode": "^1.5.6",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "embedded-postgres": "^18.4.0-beta.17",
+    "eslint": "^9.0.0",
+    "eslint-config-next": "16.4.0",
+    "prisma": "^7.10.0",
+    "tailwindcss": "^4.1.0",
+    "typescript": "^5.9.0"
+  }
+}

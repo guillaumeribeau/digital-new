@@ -1,0 +1,467 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum LeadStatus {
+  PENDING_VERIFICATION
+  NEW
+  TO_QUALIFY
+  QUALIFIED
+  REJECTED
+  IN_PROGRESS
+  PREVIEW_SENT
+  APPROVED
+  AWAITING_PAYMENT
+  PAID
+  PUBLISHING
+  PUBLISHED
+  CANCELLED
+}
+
+enum OutboxKind {
+  VERIFY_EMAIL
+  RECEIPT
+  INTERNAL_NOTIFICATION
+}
+
+enum OutboxStatus {
+  PENDING
+  PROCESSING
+  SENT
+  DEAD
+  CANCELLED
+}
+
+model Lead {
+  id                     String     @id @default(uuid()) @db.Uuid
+  createdAt              DateTime   @default(now()) @db.Timestamptz(3)
+  updatedAt              DateTime   @updatedAt @db.Timestamptz(3)
+  status                 LeadStatus @default(PENDING_VERIFICATION)
+  requestId              String     @unique @db.Uuid
+  payloadHash            String     @db.Char(64)
+  fullName               String     @db.VarChar(200)
+  firstName              String?    @db.VarChar(200)
+  lastName               String?    @db.VarChar(200)
+  email                  String     @db.VarChar(254)
+  phone                  String?    @db.VarChar(25)
+  preferredContactMethod String     @db.VarChar(20)
+  businessName           String     @db.VarChar(200)
+  businessType           String?    @db.VarChar(200)
+  businessSector         String     @db.VarChar(100)
+  siret                  String?    @db.VarChar(14)
+  city                   String     @db.VarChar(200)
+  hasWebsite             String?    @db.VarChar(10)
+  currentWebsite         String?    @db.VarChar(500)
+  projectDescription     String?    @db.VarChar(1500)
+  services               String     @db.VarChar(1500)
+  preferredStyle         String     @db.VarChar(50)
+  preferredColors        String?    @db.VarChar(200)
+  hasLogo                String?    @db.VarChar(20)
+  hasPhotos              String?    @db.VarChar(20)
+  additionalInformation  String?    @db.VarChar(2000)
+  emailVerifiedAt        DateTime?  @db.Timestamptz(3)
+  pricingAcknowledgedAt  DateTime   @db.Timestamptz(3)
+  pricingVersion         String     @db.VarChar(50)
+  privacyAcknowledgedAt  DateTime   @db.Timestamptz(3)
+  privacyVersion         String     @db.VarChar(50)
+  source                 String     @db.VarChar(50)
+  utmSource              String?    @db.VarChar(200)
+  utmMedium              String?    @db.VarChar(200)
+  utmCampaign            String?    @db.VarChar(200)
+  verificationTokens     EmailVerificationToken[]
+  outboxEvents           OutboxEvent[]
+  files                  LeadFile[]
+  project                Project?
+  internalNotes          InternalNote[]
+  activityLogs           ActivityLog[]
+  conversation           Conversation?
+  quotes                 Quote[]
+
+  @@index([status, createdAt])
+  @@index([email])
+  @@index([createdAt])
+}
+
+model EmailVerificationToken {
+  id         String    @id @default(uuid()) @db.Uuid
+  leadId     String    @db.Uuid
+  tokenHash  String    @unique @db.Char(64)
+  createdAt  DateTime  @default(now()) @db.Timestamptz(3)
+  expiresAt  DateTime  @db.Timestamptz(3)
+  usedAt     DateTime? @db.Timestamptz(3)
+  revokedAt  DateTime? @db.Timestamptz(3)
+  lead       Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([leadId, createdAt])
+  @@index([expiresAt])
+}
+
+model OutboxEvent {
+  id                String       @id @default(uuid()) @db.Uuid
+  leadId            String       @db.Uuid
+  kind              OutboxKind
+  status            OutboxStatus @default(PENDING)
+  payloadEncrypted  String?      @db.Text
+  createdAt         DateTime     @default(now()) @db.Timestamptz(3)
+  availableAt       DateTime     @default(now()) @db.Timestamptz(3)
+  expiresAt         DateTime     @db.Timestamptz(3)
+  attempts          Int          @default(0)
+  lockedUntil       DateTime?    @db.Timestamptz(3)
+  lockId            String?      @db.Uuid
+  sentAt            DateTime?    @db.Timestamptz(3)
+  providerMessageId String?      @db.VarChar(200)
+  lastError         String?      @db.VarChar(100)
+  lead              Lead         @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([status, availableAt])
+  @@index([leadId, kind])
+}
+
+// References only. No upload endpoint is enabled in the showcase site.
+model LeadFile {
+  id           String   @id @default(uuid()) @db.Uuid
+  leadId       String   @db.Uuid
+  objectKey    String   @unique @db.VarChar(500)
+  originalName String   @db.VarChar(200)
+  mimeType     String   @db.VarChar(100)
+  sizeBytes    Int
+  createdAt    DateTime @default(now()) @db.Timestamptz(3)
+  lead         Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([leadId])
+}
+
+enum ProjectStage {
+  ACCEPTED
+  CONTENT_PREPARATION
+  CREATION
+  REVIEW
+  PREVIEW_READY
+  PREVIEW_SENT
+  AWAITING_APPROVAL
+  APPROVED
+  AWAITING_PAYMENT
+  PAID
+  PUBLISHING
+  PUBLISHED
+  CANCELLED
+}
+
+model Project {
+  id              String @id @default(uuid()) @db.Uuid
+  leadId          String @unique @db.Uuid
+  stage           ProjectStage @default(ACCEPTED)
+  previewUrl      String? @db.VarChar(1000)
+  websiteUrl      String? @db.VarChar(1000)
+  vercelProjectId String? @db.VarChar(200)
+  stripeCustomerId String? @db.VarChar(200)
+  createdAt       DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime @updatedAt @db.Timestamptz(3)
+  lead            Lead @relation(fields: [leadId], references: [id], onDelete: Restrict)
+  notes           InternalNote[]
+  activityLogs    ActivityLog[]
+  quotes          Quote[]
+  @@index([stage, createdAt])
+}
+
+model AdminUser {
+  id        String @id @default(uuid()) @db.Uuid
+  userId    String @unique @db.Uuid
+  active    Boolean @default(true)
+  role      String @default("ADMIN") @db.VarChar(20)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  user      User @relation(fields: [userId], references: [id], onDelete: Restrict)
+  notes     InternalNote[]
+  actions   ActivityLog[]
+}
+
+model InternalNote {
+  id        String @id @default(uuid()) @db.Uuid
+  leadId    String? @db.Uuid
+  projectId String? @db.Uuid
+  authorId  String @db.Uuid
+  content   String @db.VarChar(5000)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  lead      Lead? @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  project   Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  author    AdminUser @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  @@index([leadId, createdAt])
+  @@index([projectId, createdAt])
+}
+
+model ActivityLog {
+  id        String @id @default(uuid()) @db.Uuid
+  leadId    String? @db.Uuid
+  projectId String? @db.Uuid
+  actorId   String @db.Uuid
+  action    String @db.VarChar(100)
+  before    String? @db.VarChar(100)
+  after     String? @db.VarChar(100)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  lead      Lead? @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  project   Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  actor     AdminUser @relation(fields: [actorId], references: [id], onDelete: Restrict)
+  @@index([leadId, createdAt])
+  @@index([projectId, createdAt])
+}
+
+model User {
+  id               String @id @default(uuid()) @db.Uuid
+  name             String
+  email            String @unique
+  emailVerified    Boolean @default(false)
+  image            String?
+  twoFactorEnabled Boolean @default(false)
+  createdAt        DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime @updatedAt @db.Timestamptz(3)
+  sessions         Session[]
+  accounts         Account[]
+  twoFactors       TwoFactor[]
+  admin            AdminUser?
+  @@map("auth_user")
+}
+
+model Session {
+  id         String @id @default(uuid()) @db.Uuid
+  token      String @unique
+  userId     String @db.Uuid
+  expiresAt  DateTime @db.Timestamptz(3)
+  createdAt  DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt  DateTime @updatedAt @db.Timestamptz(3)
+  ipAddress  String?
+  userAgent  String?
+  mfaVerifiedAt DateTime? @db.Timestamptz(3)
+  user       User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId])
+  @@map("auth_session")
+}
+
+model Account {
+  id                    String @id @default(uuid()) @db.Uuid
+  userId                String @db.Uuid
+  accountId             String
+  providerId            String
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime? @db.Timestamptz(3)
+  refreshTokenExpiresAt DateTime? @db.Timestamptz(3)
+  scope                 String?
+  password              String?
+  createdAt             DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt             DateTime @updatedAt @db.Timestamptz(3)
+  user                  User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([providerId, accountId])
+  @@index([userId])
+  @@map("auth_account")
+}
+
+model Verification {
+  id         String @id @default(uuid()) @db.Uuid
+  identifier String
+  value      String
+  expiresAt  DateTime @db.Timestamptz(3)
+  createdAt  DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt  DateTime @updatedAt @db.Timestamptz(3)
+  @@index([identifier])
+  @@map("auth_verification")
+}
+
+model TwoFactor {
+  id                      String @id @default(uuid()) @db.Uuid
+  secret                  String
+  backupCodes             String
+  userId                  String @db.Uuid
+  verified                Boolean @default(true)
+  failedVerificationCount Int @default(0)
+  lockedUntil             DateTime? @db.Timestamptz(3)
+  user                    User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId])
+  @@index([secret])
+  @@map("auth_two_factor")
+}
+
+model AuthRateBucket {
+  key       String @id @db.Char(64)
+  count     Int
+  expiresAt DateTime @db.Timestamptz(3)
+  @@index([expiresAt])
+}
+
+enum QuoteStatus {
+  DRAFT
+  SENT
+  ACCEPTED
+  DECLINED
+  EXPIRED
+  CANCELLED
+  SUPERSEDED
+  PAID
+  COMPLETED
+}
+
+model CommercialSettings {
+  id                 String @id @default("main")
+  legalName          String @default("") @db.VarChar(200)
+  address            String @default("") @db.VarChar(1000)
+  registrationNumber String @default("") @db.VarChar(100)
+  vatNumber          String @default("") @db.VarChar(100)
+  taxNote            String @default("") @db.VarChar(1000)
+  terms              String @default("") @db.Text
+  validityDays       Int @default(30)
+  reminderDays       Int @default(0)
+  counter            Int @default(0)
+  updatedAt          DateTime @updatedAt @db.Timestamptz(3)
+}
+
+model Conversation {
+  id           String @id @default(uuid()) @db.Uuid
+  leadId       String @unique @db.Uuid
+  replyToken   String @unique @db.VarChar(64)
+  needsReply   Boolean @default(false)
+  createdAt    DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime @updatedAt @db.Timestamptz(3)
+  lead         Lead @relation(fields: [leadId], references: [id], onDelete: Restrict)
+  messages     ClientMessage[]
+}
+
+model ClientMessage {
+  id               String @id @default(uuid()) @db.Uuid
+  conversationId   String @db.Uuid
+  direction        String @db.VarChar(20)
+  subject          String @db.VarChar(300)
+  content          String @db.Text
+  sender           String @db.VarChar(300)
+  deliveryStatus   String @default("QUEUED") @db.VarChar(30)
+  providerId       String? @unique @db.VarChar(200)
+  smtpMessageId    String? @db.VarChar(500)
+  attachments      Json @default("[]")
+  createdAt        DateTime @default(now()) @db.Timestamptz(3)
+  conversation     Conversation @relation(fields: [conversationId], references: [id], onDelete: Restrict)
+  emails           CommercialEmail[]
+  @@index([conversationId, createdAt])
+}
+
+model Quote {
+  id                String @id @default(uuid()) @db.Uuid
+  leadId            String @db.Uuid
+  projectId         String? @db.Uuid
+  number            String @unique @db.VarChar(50)
+  status            QuoteStatus @default(DRAFT)
+  title             String @db.VarChar(200)
+  items             Json
+  subtotalCents     Int
+  taxCents          Int
+  totalCents        Int
+  currency          String @default("eur") @db.VarChar(3)
+  billingAddress    String @db.VarChar(1000)
+  billingName       String @default("") @db.VarChar(200)
+  billingRegistrationNumber String @default("") @db.VarChar(100)
+  billingVatNumber  String @default("") @db.VarChar(100)
+  deliveryTime      String @db.VarChar(1000)
+  terms             String @db.Text
+  snapshot          Json?
+  documentHash      String? @db.Char(64)
+  parentId          String? @db.Uuid
+  validUntil        DateTime @db.Timestamptz(3)
+  createdAt         DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime @updatedAt @db.Timestamptz(3)
+  sentAt            DateTime? @db.Timestamptz(3)
+  acceptedAt        DateTime? @db.Timestamptz(3)
+  acceptedName      String? @db.VarChar(200)
+  acceptanceHash    String? @db.Char(64)
+  paidAt            DateTime? @db.Timestamptz(3)
+  paymentMode       String? @db.VarChar(10)
+  nextReminderAt    DateTime? @db.Timestamptz(3)
+  reminderCount     Int @default(0)
+  lead              Lead @relation(fields: [leadId], references: [id], onDelete: Restrict)
+  project           Project? @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  access            QuoteAccess[]
+  payments          PaymentAttempt[]
+  emails            CommercialEmail[]
+  parent            Quote? @relation("QuoteRevisions", fields: [parentId], references: [id], onDelete: Restrict)
+  revisions         Quote[] @relation("QuoteRevisions")
+  @@index([leadId, createdAt])
+  @@index([status, nextReminderAt])
+  @@index([parentId])
+}
+
+model QuoteAccess {
+  id             String @id @default(uuid()) @db.Uuid
+  quoteId        String @db.Uuid
+  tokenHash      String @unique @db.Char(64)
+  tokenEncrypted String @db.Text
+  expiresAt      DateTime @db.Timestamptz(3)
+  revokedAt      DateTime? @db.Timestamptz(3)
+  createdAt      DateTime @default(now()) @db.Timestamptz(3)
+  quote          Quote @relation(fields: [quoteId], references: [id], onDelete: Restrict)
+  @@index([quoteId])
+}
+
+model PaymentAttempt {
+  id              String @id @default(uuid()) @db.Uuid
+  quoteId         String @db.Uuid
+  mode            String @db.VarChar(10)
+  status          String @default("CREATING") @db.VarChar(30)
+  amountCents     Int
+  currency        String @db.VarChar(3)
+  stripeSessionId String? @unique @db.VarChar(200)
+  checkoutUrl     String? @db.VarChar(2000)
+  expiresAt       DateTime? @db.Timestamptz(3)
+  createdAt       DateTime @default(now()) @db.Timestamptz(3)
+  paidAt          DateTime? @db.Timestamptz(3)
+  quote           Quote @relation(fields: [quoteId], references: [id], onDelete: Restrict)
+  @@index([quoteId, createdAt])
+}
+
+model CommercialEmail {
+  id                String @id @default(uuid()) @db.Uuid
+  quoteId           String? @db.Uuid
+  messageId         String? @db.Uuid
+  kind              String @db.VarChar(40)
+  payloadEncrypted  String? @db.Text
+  status            String @default("PENDING") @db.VarChar(30)
+  createdAt         DateTime @default(now()) @db.Timestamptz(3)
+  availableAt       DateTime @default(now()) @db.Timestamptz(3)
+  expiresAt         DateTime @db.Timestamptz(3)
+  attempts          Int @default(0)
+  lockId            String? @db.Uuid
+  lockedUntil       DateTime? @db.Timestamptz(3)
+  providerMessageId String? @unique @db.VarChar(200)
+  sentAt            DateTime? @db.Timestamptz(3)
+  lastError         String? @db.VarChar(100)
+  quote             Quote? @relation(fields: [quoteId], references: [id], onDelete: Restrict)
+  message           ClientMessage? @relation(fields: [messageId], references: [id], onDelete: Restrict)
+  @@index([status, availableAt])
+}
+
+model CommercialWebhook {
+  key         String @id @db.VarChar(250)
+  provider    String @db.VarChar(20)
+  emailId     String? @db.VarChar(200)
+  deliveryStatus String? @db.VarChar(30)
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  @@index([emailId])
+}
+
+model ServiceTemplate {
+  id              String @id @default(uuid()) @db.Uuid
+  label           String @db.VarChar(200)
+  description     String @db.VarChar(2000)
+  unitCents       Int
+  taxBasisPoints  Int @default(0)
+  active          Boolean @default(true)
+}
+
+model MessageTemplate {
+  id      String @id @default(uuid()) @db.Uuid
+  label   String @db.VarChar(100)
+  subject String @db.VarChar(300)
+  content String @db.Text
+  active  Boolean @default(true)
+}
