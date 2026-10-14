@@ -19,13 +19,15 @@ Utiliser la connexion GitHub dans le navigateur ou le gestionnaire d’identifia
 
 ## Services Railway
 
-Créer un projet de préproduction, puis un PostgreSQL neuf. Ajouter deux services depuis le même dépôt GitHub, avec la racine du dépôt comme Root Directory. Choisir ces chemins dans Settings → Railway Config File :
+Créer un projet de préproduction, puis un PostgreSQL neuf. Ajouter deux services depuis le même dépôt GitHub, avec la racine du dépôt comme Root Directory. Pour les nouveaux services, renseigner directement les commandes ci-dessous dans leurs paramètres :
 
-| Service | Configuration | Domaine public |
-| --- | --- | --- |
-| Site vitrine | `/railway.website.toml` | Générer un domaine Railway |
-| Administration | `/railway.admin.toml` | Générer un domaine Railway distinct |
-| Worker e-mails | `/railway.worker.toml` | Aucun ; ajouter au moment de configurer Resend |
+| Service | Build | Démarrage | Domaine public |
+| --- | --- | --- | --- |
+| Site vitrine | `npm run build:website` | `npm run start -- --hostname 0.0.0.0` | Générer un domaine Railway |
+| Administration | `npm run build:admin` | `npm run start:admin -- --hostname 0.0.0.0` | Générer un domaine Railway distinct |
+| Worker e-mails | `npm run db:generate` | `npm run outbox:watch` | Aucun ; ajouter au moment de configurer Resend |
+
+Les fichiers `railway.*.toml` conservent le récapitulatif des réglages historiques. Railway a déprécié Config as Code : les nouveaux services ne peuvent pas l'activer, et sa lecture pour les services existants s'arrête le 1er décembre 2026. Utiliser les paramètres des services ou [Infrastructure as Code](https://docs.railway.com/infrastructure-as-code) pour les nouveaux déploiements. Configurer aussi Railpack, les chemins de healthcheck, leur délai de 120 secondes et les patterns de surveillance directement dans les paramètres.
 
 Les configurations utilisent Railpack et Node 22. Les commandes de démarrage écoutent sur `0.0.0.0` et Next utilise le `PORT` fourni par Railway. Les contrôles HTTP vérifient `/` et `/connexion` ; le contrôle de connexion à PostgreSQL est une étape supplémentaire.
 

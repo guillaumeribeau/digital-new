@@ -6,7 +6,7 @@ Le service site vitrine exige les clés réelles `TURNSTILE_SITE_KEY` et `TURNST
 
 Prévoir PostgreSQL, un service site vitrine, un service administration et un processus worker d’e-mails. Les deux applications web sont indépendantes ; le worker reprend le pipeline existant. Les sites clients futurs restent destinés à Vercel, sans intégration active dans cette version.
 
-Installer depuis la racine avec `npm ci`. Pour les services partageant des packages, conserver la racine du dépôt comme contexte d’installation/build ; ne pas limiter le contexte à `apps/admin` ou `apps/website`. Sélectionner le fichier de configuration Railway adapté dans chaque service :
+Installer depuis la racine avec `npm ci`. Pour les services partageant des packages, conserver la racine du dépôt comme contexte d’installation/build ; ne pas limiter le contexte à `apps/admin` ou `apps/website`. Configurer directement les commandes dans les paramètres des nouveaux services. Les fichiers TOML ci-dessous sont des références historiques : Config as Code est déprécié, indisponible pour les nouveaux services et cesse d'être lu le 1er décembre 2026. Utiliser les paramètres ou [Infrastructure as Code](https://docs.railway.com/infrastructure-as-code).
 
 | Service | Configuration | Build | Démarrage |
 | --- | --- | --- | --- |
