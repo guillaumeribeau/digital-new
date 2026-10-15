@@ -12,8 +12,29 @@ const messages: Record<string, string> = {
   USE_PROJECT_STATUS: "Modifiez le suivi depuis le projet associé.", NOT_QUALIFIED: "La demande doit être vérifiée et qualifiée.",
   WEBSITE_URL_REQUIRED: "Renseignez l’URL du site avant de le marquer en ligne.",
   PREVIEW_URL_REQUIRED: "Renseignez le lien de prévisualisation avant d’envoyer la proposition.",
+  LEAD_HAS_RELATED_RECORDS: "Cette demande est liée à un projet, un devis ou des échanges. Conservez-la pour maintenir le suivi du client.",
+  LEAD_IN_TRASH: "Restaurez cette demande depuis la corbeille avant de la modifier.",
 };
 export type ActionResult = { error?: string; success?: string };
+export async function leadVisibilityAction(_previous: ActionResult, form: FormData): Promise<ActionResult> {
+  let deleted: boolean;
+  let id: string;
+  try {
+    id = z.uuid().parse(form.get("id"));
+    deleted = z.enum(["trash", "restore"]).parse(form.get("operation")) === "trash";
+    await adminService.setLeadDeleted(await headers(), {
+      id, deleted, expectedUpdatedAt: form.get("expectedUpdatedAt"), confirmed: form.get("confirmed") === "yes",
+    });
+  } catch (error) {
+    if (error instanceof AdminAccessError) return { error: "Votre accès a expiré. Reconnectez-vous." };
+    if (error instanceof BusinessError) return { error: messages[error.message] || "Action non autorisée." };
+    if (error instanceof z.ZodError) return { error: "Vérifiez la demande et confirmez votre choix." };
+    console.error("admin_lead_visibility_failed");
+    return { error: "La modification est temporairement indisponible. Réessayez." };
+  }
+  revalidatePath("/", "layout");
+  redirect(deleted ? "/demandes?notice=trashed" : "/demandes/" + id);
+}
 export async function saveAction(_previous: ActionResult, form: FormData): Promise<ActionResult> {
   try {
     const requestHeaders = await headers();

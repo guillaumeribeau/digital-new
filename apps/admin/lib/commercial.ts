@@ -29,14 +29,14 @@ export async function buildSnapshot(quote: Quote) {
 export const commercialService = {
   async clients(headers: Headers, q = "", page = 1) {
     await authenticate(headers); q = z.string().max(200).parse(q); page = z.number().int().min(1).max(100000).parse(page);
-    const where: Prisma.LeadWhereInput = q ? { OR: ["businessName", "fullName", "email"].map((field) => ({ [field]: { contains: q, mode: "insensitive" } })) } : {};
+    const where: Prisma.LeadWhereInput = { deletedAt: null, ...(q ? { OR: ["businessName", "fullName", "email"].map((field) => ({ [field]: { contains: q, mode: "insensitive" } })) } : {}) };
     const [rows, count] = await getDb().$transaction([getDb().lead.findMany({ where, orderBy: { createdAt: "desc" }, take: 20, skip: (page - 1) * 20,
       select: { id: true, businessName: true, fullName: true, email: true, emailVerifiedAt: true, conversation: { select: { needsReply: true } }, _count: { select: { quotes: true } } } }), getDb().lead.count({ where })]);
     return { rows, count };
   },
   async client(headers: Headers, id: string) {
     await authenticate(headers);
-    return getDb().lead.findUnique({ where: { id: z.uuid().parse(id) }, include: { project: true,
+    return getDb().lead.findUnique({ where: { id: z.uuid().parse(id), deletedAt: null }, include: { project: true,
       conversation: { include: { messages: { orderBy: { createdAt: "desc" }, take: 100 } } },
       quotes: { orderBy: { createdAt: "desc" }, take: 100, include: { payments: { orderBy: { createdAt: "desc" }, take: 20 }, emails: { select: { status: true }, take: 1, orderBy: { createdAt: "desc" } } } },
     } });
@@ -71,7 +71,8 @@ export const commercialService = {
     const actor = await authenticate(headers); configured();
     const data = z.object({ leadId: z.uuid(), subject: z.string().trim().min(2).max(300), content: z.string().trim().min(2).max(20000), requestId: z.uuid() }).parse(input);
     return getDb().$transaction(async (tx) => {
-      const lead = await tx.lead.findUniqueOrThrow({ where: { id: data.leadId } });
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${data.leadId}::uuid::text, 0))`;
+      const lead = await tx.lead.findUniqueOrThrow({ where: { id: data.leadId, deletedAt: null } });
       if (!lead.emailVerifiedAt) throw new CommercialError("CLIENT_UNVERIFIED");
       const conversation = await tx.conversation.upsert({ where: { leadId: lead.id }, create: { leadId: lead.id, replyToken: randomBytes(24).toString("hex") }, update: {} });
       const existing = await tx.clientMessage.findUnique({ where: { id: data.requestId } });
@@ -92,7 +93,8 @@ export const commercialService = {
   async createQuote(headers: Headers, input: unknown, id?: string, expectedUpdatedAt?: string) {
     const actor = await authenticate(headers), data = quoteInput.parse(input), totals = calculate(data.items);
     return getDb().$transaction(async (tx) => {
-      const lead = await tx.lead.findUniqueOrThrow({ where: { id: data.leadId }, include: { project: true } });
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${data.leadId}::uuid::text, 0))`;
+      const lead = await tx.lead.findUniqueOrThrow({ where: { id: data.leadId, deletedAt: null }, include: { project: true } });
       if (data.parentId) {
         const parent = await tx.quote.findUniqueOrThrow({ where: { id: data.parentId } });
         if (parent.leadId !== lead.id || ["ACCEPTED", "PAID", "COMPLETED"].includes(parent.status)) throw new CommercialError("IMMUTABLE_QUOTE");
@@ -170,7 +172,8 @@ export const commercialService = {
     await authenticate(headers); if (!commercialLocal()) throw new CommercialError("INVALID_ACTION");
     const data = z.object({ leadId: z.uuid(), content: z.string().trim().min(2).max(20000), requestId: z.uuid() }).parse(input);
     await getDb().$transaction(async (tx) => {
-      const lead = await tx.lead.findUniqueOrThrow({ where: { id: data.leadId } });
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${data.leadId}::uuid::text, 0))`;
+      const lead = await tx.lead.findUniqueOrThrow({ where: { id: data.leadId, deletedAt: null } });
       const conversation = await tx.conversation.upsert({ where: { leadId: lead.id }, create: { leadId: lead.id, replyToken: randomBytes(24).toString("hex") }, update: {} });
       if (await tx.clientMessage.findUnique({ where: { id: data.requestId } })) return;
       await tx.clientMessage.create({ data: { id: data.requestId, conversationId: conversation.id, direction: "INBOUND", subject: "Réponse de test local", content: data.content, sender: lead.email, deliveryStatus: "RECEIVED_LOCAL" } });

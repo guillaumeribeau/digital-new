@@ -70,7 +70,7 @@ async function main() {
     await run(["--import", "tsx", "--test", "tests/integration/pipeline.test.ts"], env);
     await run(["--import", "tsx", "--test", "tests/integration/admin.test.ts"], env);
     await run(["--import", "tsx", "--test", "tests/integration/commercial.test.ts"], env);
-    if (process.argv.includes("--ui") || process.argv.includes("--commercial-ui")) {
+    if (process.argv.includes("--ui") || process.argv.includes("--commercial-ui") || process.argv.includes("--trash-ui")) {
       const adminPort = await freePort(), websitePort = await freePort();
       const uiEnv = { ...env, BETTER_AUTH_URL: `http://127.0.0.1:${adminPort}`, NEXT_PUBLIC_SITE_URL: `http://127.0.0.1:${websitePort}`, NEXT_PUBLIC_GTM_ID: "", NEXT_TELEMETRY_DISABLED: "1" };
       Object.assign(uiEnv, { LEAD_EMAIL_MODE: "local", LOCAL_EMAIL_PREVIEW_TOKEN: randomBytes(32).toString("hex") });
@@ -83,11 +83,14 @@ async function main() {
         servers.push(spawn(process.execPath, ["node_modules/next/dist/bin/next", "dev", "apps/admin", "--hostname", "127.0.0.1", "--port", String(adminPort)], { env: nextEnv, windowsHide: true, stdio: "inherit" }));
         servers.push(spawn(process.execPath, ["node_modules/next/dist/bin/next", "dev", "apps/website", "--hostname", "127.0.0.1", "--port", String(websitePort)], { env: nextEnv, windowsHide: true, stdio: "inherit" }));
         await Promise.all([ready(uiEnv.BETTER_AUTH_URL + "/connexion"), ready(uiEnv.NEXT_PUBLIC_SITE_URL + "/")]);
+        if (process.argv.includes("--trash-ui")) await run(["--import", "tsx", "scripts/check-lead-trash-ui.ts"], uiEnv);
+        else {
         if (!process.argv.includes("--commercial-ui")) await run(["--import", "tsx", "scripts/check-admin-ui.ts"], uiEnv);
         await run(["--import", "tsx", "scripts/check-commercial-ui.ts"], uiEnv);
         if (!process.argv.includes("--commercial-ui")) {
           await run(["scripts/check-lead-form.mjs"], { ...uiEnv, QA_BASE_URL: uiEnv.NEXT_PUBLIC_SITE_URL });
           await run(["scripts/check-lead-verification.mjs"], { ...uiEnv, QA_BASE_URL: uiEnv.NEXT_PUBLIC_SITE_URL });
+        }
         }
       } finally {
         await Promise.all(servers.map(stopServer));

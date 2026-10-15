@@ -22,11 +22,13 @@ export async function processOutbox(limit = 20) {
       UPDATE "OutboxEvent" SET "status" = 'PROCESSING', "lockId" = ${lockId}::uuid,
         "lockedUntil" = ${lockedUntil}::timestamptz, "attempts" = "attempts" + 1
       WHERE "id" = (
-        SELECT "id" FROM "OutboxEvent"
-        WHERE ("status" = 'PENDING' AND "availableAt" <= ${now}::timestamptz
-          OR "status" = 'PROCESSING' AND "lockedUntil" <= ${now}::timestamptz)
-          AND "expiresAt" > ${now}::timestamptz AND "attempts" < 8
-        ORDER BY "availableAt" FOR UPDATE SKIP LOCKED LIMIT 1
+        SELECT event."id" FROM "OutboxEvent" event
+        JOIN "Lead" lead ON lead."id" = event."leadId"
+        WHERE lead."deletedAt" IS NULL
+          AND (event."status" = 'PENDING' AND event."availableAt" <= ${now}::timestamptz
+          OR event."status" = 'PROCESSING' AND event."lockedUntil" <= ${now}::timestamptz)
+          AND event."expiresAt" > ${now}::timestamptz AND event."attempts" < 8
+        ORDER BY event."availableAt" FOR UPDATE OF event SKIP LOCKED LIMIT 1
       ) RETURNING *`;
     const event = rows[0];
     if (!event) break;

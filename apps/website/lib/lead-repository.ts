@@ -64,13 +64,15 @@ export const leadRepository = {
       const record = await tx.emailVerificationToken.findUnique({ where: { tokenHash: tokenHash(token) } });
       if (!record) return false;
       await tx.$queryRaw`SELECT "id" FROM "Lead" WHERE "id" = ${record.leadId}::uuid FOR UPDATE`;
+      const activeLead = await tx.lead.findFirst({ where: { id: record.leadId, deletedAt: null }, select: { id: true } });
+      if (!activeLead) return false;
       const now = new Date();
       const consumed = await tx.emailVerificationToken.updateMany({
         where: { id: record.id, usedAt: null, revokedAt: null, expiresAt: { gt: now } }, data: { usedAt: now },
       });
       if (consumed.count !== 1) return false;
       const updated = await tx.lead.updateMany({
-        where: { id: record.leadId, status: "PENDING_VERIFICATION", emailVerifiedAt: null },
+        where: { id: record.leadId, deletedAt: null, status: "PENDING_VERIFICATION", emailVerifiedAt: null },
         data: { status: "NEW", emailVerifiedAt: now },
       });
       if (updated.count !== 1) return false;
@@ -88,7 +90,7 @@ export const leadRepository = {
     await getDb().$transaction(async (tx) => {
       await tx.$queryRaw`SELECT "id" FROM "Lead" WHERE "id" = ${reference}::uuid FOR UPDATE`;
       const lead = await tx.lead.findUnique({ where: { id: reference } });
-      if (!lead || lead.email !== email.toLowerCase() || lead.status !== "PENDING_VERIFICATION") return;
+      if (!lead || lead.deletedAt || lead.email !== email.toLowerCase() || lead.status !== "PENDING_VERIFICATION") return;
       const now = new Date();
       const recent = await tx.emailVerificationToken.findFirst({ where: { leadId: reference }, orderBy: { createdAt: "desc" } });
       if (recent && now.getTime() - recent.createdAt.getTime() < 60000) return;

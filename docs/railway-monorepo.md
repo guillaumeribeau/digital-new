@@ -37,7 +37,7 @@ GRANT UPDATE ("status", "emailVerifiedAt", "updatedAt") ON "Lead" TO nova_web;
 GRANT SELECT, INSERT, UPDATE ON "EmailVerificationToken", "OutboxEvent" TO nova_web;
 
 GRANT SELECT ON "Lead", "LeadFile" TO nova_admin;
-GRANT UPDATE ("status", "updatedAt") ON "Lead" TO nova_admin;
+GRANT UPDATE ("status", "updatedAt", "deletedAt") ON "Lead" TO nova_admin;
 GRANT SELECT, INSERT, UPDATE ON "Project" TO nova_admin;
 GRANT SELECT, INSERT ON "InternalNote", "ActivityLog" TO nova_admin;
 GRANT SELECT ON "AdminUser" TO nova_admin;
@@ -45,6 +45,7 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON auth_user, auth_session,
   auth_account, auth_verification, auth_two_factor, "AuthRateBucket" TO nova_admin;
 
 GRANT SELECT, UPDATE ON "OutboxEvent" TO nova_worker;
+GRANT SELECT ("id", "deletedAt") ON "Lead" TO nova_worker;
 ```
 
 Accorder CONNECT sur la base et attribuer chaque rôle à un utilisateur LOGIN dont le mot de passe est généré et conservé hors Git. Ne pas accorder au site les tables auth, notes, historique ou projets. Le rôle administration ne peut pas modifier emailVerifiedAt et ne lit pas les jetons prospects ou contenus d’outbox. L’historique est SELECT/INSERT uniquement pour le runtime. Les UUID sont générés par Prisma/Better Auth ; aucune séquence n’est utilisée.

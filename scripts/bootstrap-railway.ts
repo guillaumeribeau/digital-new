@@ -35,11 +35,12 @@ async function main() {
     await db.query(`GRANT UPDATE ("status", "emailVerifiedAt", "updatedAt") ON "Lead" TO ${web}`);
     await db.query(`GRANT SELECT, INSERT, UPDATE ON "EmailVerificationToken", "OutboxEvent" TO ${web}`);
     await db.query(`GRANT SELECT ON "Lead", "LeadFile", "AdminUser" TO ${admin}`);
-    await db.query(`GRANT UPDATE ("status", "updatedAt") ON "Lead" TO ${admin}`);
+    await db.query(`GRANT UPDATE ("status", "updatedAt", "deletedAt") ON "Lead" TO ${admin}`);
     await db.query(`GRANT SELECT, INSERT, UPDATE ON "Project" TO ${admin}`);
     await db.query(`GRANT SELECT, INSERT ON "InternalNote", "ActivityLog" TO ${admin}`);
     await db.query(`GRANT SELECT, INSERT, UPDATE, DELETE ON auth_user, auth_session, auth_account, auth_verification, auth_two_factor, "AuthRateBucket" TO ${admin}`);
     await db.query(`GRANT SELECT, UPDATE ON "OutboxEvent" TO ${worker}`);
+    await db.query(`GRANT SELECT ("id", "deletedAt") ON "Lead" TO ${worker}`);
     await grantCommercialPermissions(db, roles.admin.name, roles.worker.name);
     await db.query("REVOKE CREATE ON SCHEMA public FROM PUBLIC");
     const id = randomUUID();

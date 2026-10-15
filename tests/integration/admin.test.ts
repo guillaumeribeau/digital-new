@@ -10,6 +10,7 @@ import { leadRepository } from "../../apps/website/lib/lead-repository";
 import { leadSchema } from "@nova/validation";
 import { decryptPayload } from "../../apps/website/lib/lead-security";
 import { limitAuth } from "../../apps/admin/lib/rate-limit";
+import { processOutbox } from "../../apps/website/lib/outbox";
 
 const db = getDb();
 const password = "Fictitious-Test-Password-42!";
@@ -34,6 +35,7 @@ test("aucune lecture ou mutation anonyme et inscription publique interdite", asy
   await assert.rejects(adminService.leads(new Headers(), {}), AdminAccessError);
   await assert.rejects(adminService.note(new Headers(), { id: randomUUID(), kind: "lead", content: "Intrusion" }), AdminAccessError);
   await assert.rejects(adminService.convert(new Headers(), randomUUID()), AdminAccessError);
+  await assert.rejects(adminService.setLeadDeleted(new Headers(), {}), AdminAccessError);
   assert.equal((await call("sign-up/email", { email: "intrus@example.com", password })).status, 404);
   assert.equal((await call("update-user", { name: "Intrus" })).status, 404);
 });
@@ -104,6 +106,55 @@ test("suivi de production, liens HTTPS, conflits et historique transactionnel", 
   assert.equal((await adminService.dashboard(authenticated())).completed, 1);
   assert.equal(await db.activityLog.count({ where: { projectId: project.id, action: "PROJECT_STAGE_CHANGED" } }), 11);
 });
+test("corbeille : retrait des listes, arrêt de la validation et des envois, restauration avec historique", async () => {
+  const before = await adminService.dashboard(authenticated());
+  const { reference } = await leadRepository.submit(input("Demande à restaurer"));
+  const lead = await db.lead.findUniqueOrThrow({ where: { id: reference } });
+  const event = await db.outboxEvent.findFirstOrThrow({ where: { leadId: reference, kind: "VERIFY_EMAIL" } });
+  const payload = decryptPayload(event.payloadEncrypted!) as { text: string };
+  const token = payload.text.match(/#token=([A-Za-z0-9_-]+)/)![1];
+  const mutation = { id: reference, expectedUpdatedAt: lead.updatedAt.toISOString(), deleted: true, confirmed: true };
+  await assert.rejects(adminService.setLeadDeleted(authenticated(), { ...mutation, confirmed: false }));
+  await adminService.setLeadDeleted(authenticated(), mutation);
+  assert.equal((await adminService.leads(authenticated(), { q: "Demande à restaurer" })).total, 0);
+  assert.equal((await adminService.leads(authenticated(), { q: "Demande à restaurer", view: "trash" })).total, 1);
+  assert.equal((await adminService.dashboard(authenticated())).total, before.total);
+  assert.equal(await leadRepository.verify(token), false);
+  await db.emailVerificationToken.updateMany({ where: { leadId: reference }, data: { createdAt: new Date(Date.now() - 120000) } });
+  await leadRepository.resend(reference, lead.email);
+  assert.equal(await db.emailVerificationToken.count({ where: { leadId: reference } }), 1);
+  await assert.rejects(adminService.note(authenticated(), { id: reference, kind: "lead", content: "Note sur demande supprimée" }), BusinessError);
+  const originalFetch = globalThis.fetch;
+  const sent: string[] = [];
+  globalThis.fetch = async (_url, options) => {
+    sent.push(String(options?.body));
+    return new Response(JSON.stringify({ id: randomUUID() }), { status: 200 });
+  };
+  try { await processOutbox(100); } finally { globalThis.fetch = originalFetch; }
+  assert.ok(sent.every((body) => !body.includes(reference)));
+  assert.equal((await db.outboxEvent.findUniqueOrThrow({ where: { id: event.id } })).attempts, 0);
+  await assert.rejects(adminService.setLeadDeleted(authenticated(), mutation), BusinessError);
+  const deleted = await db.lead.findUniqueOrThrow({ where: { id: reference } });
+  await adminService.setLeadDeleted(authenticated(), { ...mutation, deleted: false, expectedUpdatedAt: deleted.updatedAt.toISOString() });
+  assert.equal((await adminService.leads(authenticated(), { q: "Demande à restaurer" })).total, 1);
+  assert.equal(await leadRepository.verify(token), true, "Le clic pendant la suppression ne consomme pas le jeton");
+  const restored = await adminService.lead(authenticated(), reference);
+  assert.equal(restored?.deletedAt, null);
+  assert.deepEqual(restored?.activityLogs.map((log) => log.action).sort(), ["LEAD_RESTORED", "LEAD_TRASHED"]);
+});
+
+test("corbeille : les projets et échanges liés empêchent la suppression", async () => {
+  const project = await db.project.findFirstOrThrow();
+  const linked = await db.lead.findUniqueOrThrow({ where: { id: project.leadId } });
+  await assert.rejects(adminService.setLeadDeleted(authenticated(), { id: linked.id, expectedUpdatedAt: linked.updatedAt.toISOString(), deleted: true, confirmed: true }),
+    (error: unknown) => error instanceof BusinessError && error.message === "LEAD_HAS_RELATED_RECORDS");
+  const { reference } = await leadRepository.submit(input("Demande avec échanges"));
+  await db.conversation.create({ data: { leadId: reference, replyToken: randomUUID() } });
+  const lead = await db.lead.findUniqueOrThrow({ where: { id: reference } });
+  await assert.rejects(adminService.setLeadDeleted(authenticated(), { id: reference, expectedUpdatedAt: lead.updatedAt.toISOString(), deleted: true, confirmed: true }), BusinessError);
+  assert.equal((await db.lead.findUniqueOrThrow({ where: { id: reference } })).deletedAt, null);
+});
+
 test("reconnexion sans challenge pour un ancien compte MFA et compte revoque", async () => {
   assert.equal((await call("sign-out")).status, 200);
   await assert.rejects(adminService.dashboard(authenticated()), AdminAccessError);
@@ -132,8 +183,9 @@ test("permissions PostgreSQL : site isolé des tables privées et audit immuable
   await db.$executeRawUnsafe('GRANT USAGE ON SCHEMA public TO nova_test_web, nova_test_admin, nova_test_worker');
   await db.$executeRawUnsafe('GRANT SELECT, INSERT ON "Lead" TO nova_test_web');
   await db.$executeRawUnsafe('GRANT SELECT, UPDATE ON "OutboxEvent" TO nova_test_worker');
+  await db.$executeRawUnsafe('GRANT SELECT ("id", "deletedAt") ON "Lead" TO nova_test_worker');
   await db.$executeRawUnsafe('GRANT SELECT ON "Lead" TO nova_test_admin');
-  await db.$executeRawUnsafe('GRANT UPDATE ("status", "updatedAt") ON "Lead" TO nova_test_admin');
+  await db.$executeRawUnsafe('GRANT UPDATE ("status", "updatedAt", "deletedAt") ON "Lead" TO nova_test_admin');
   await db.$executeRawUnsafe('GRANT SELECT, INSERT ON "ActivityLog" TO nova_test_admin');
   const forbidden = async (role: "nova_test_web" | "nova_test_admin" | "nova_test_worker", sql: string) => {
     await assert.rejects(db.$transaction(async (tx) => {
@@ -145,6 +197,10 @@ test("permissions PostgreSQL : site isolé des tables privées et audit immuable
   await forbidden("nova_test_web", 'SELECT * FROM auth_session');
   await forbidden("nova_test_web", 'SELECT * FROM "Project"');
   await forbidden("nova_test_worker", 'SELECT * FROM "Lead"');
+  await db.$transaction(async (tx) => {
+    await tx.$executeRawUnsafe('SET LOCAL ROLE "nova_test_worker"');
+    await tx.$queryRawUnsafe('SELECT event."id" FROM "OutboxEvent" event JOIN "Lead" lead ON lead."id" = event."leadId" WHERE lead."deletedAt" IS NULL FOR UPDATE OF event SKIP LOCKED');
+  });
   await forbidden("nova_test_admin", 'UPDATE "ActivityLog" SET "action" = \'FORGED\'');
   await forbidden("nova_test_admin", 'UPDATE "Lead" SET "emailVerifiedAt" = NULL');
 });

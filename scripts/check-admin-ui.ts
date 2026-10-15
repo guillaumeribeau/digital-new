@@ -59,11 +59,10 @@ async function main() {
     await website.goto(websiteBase + "/emails-locaux#key=" + process.env.LOCAL_EMAIL_PREVIEW_TOKEN);
     await website.getByRole("heading", { name: "E-mails de test locaux", exact: true }).waitFor();
     const confirmationPromise = context.waitForEvent("page");
+    const verificationResponse = context.waitForEvent("response", response => response.url().endsWith("/api/leads/verify"));
     await website.getByRole("link", { name: "Ouvrir le lien de confirmation" }).click();
     const confirmation = await confirmationPromise;
     await confirmation.waitForFunction(() => !window.location.hash);
-    const verificationResponse = confirmation.waitForResponse((response) => response.url().endsWith("/api/leads/verify"));
-    await confirmation.getByRole("button", { name: "Confirmer mon adresse e-mail" }).click();
     const verified = await verificationResponse;
     assert.equal(verified.status(), 200, (await verified.json()).error);
     await confirmation.getByRole("heading", { name: "Votre demande est confirmée." }).waitFor();

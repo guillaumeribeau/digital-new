@@ -77,6 +77,16 @@ Le statut de la demande suit le projet dans la même transaction. Il se modifie 
 
 Clients regroupe maintenant les échanges, devis complémentaires et paiements. Voir [le guide relation client](relation-client.md) pour le parcours local et la configuration Resend/Stripe. Sites internet et Abonnements affichent un état « À venir » explicite. Les liens définitifs restent consultables dans les projets. Paramètres affiche le compte et les informations de fonctionnement sans révéler les variables secrètes.
 
+## Corbeille des demandes
+
+La fiche d’une demande propose « Mettre à la corbeille », suivi d’une confirmation. Les demandes supprimées sont retirées des demandes actives, des clients et des indicateurs. L’onglet « Corbeille » permet de les rechercher puis de les restaurer, avec leur contenu, leur statut et leur historique. Les actions sont réservées aux administrateurs authentifiés et refusées si la fiche a changé depuis son affichage.
+
+Une demande associée à un projet, un devis ou des échanges ne peut pas être placée dans la corbeille. Les liens de validation et le renvoi d’e-mails sont inactifs tant qu’une demande est dans la corbeille ; le worker ignore ses messages en attente. Un envoi déjà en cours chez le fournisseur ne peut pas être rappelé. La restauration rend de nouveau utilisables les liens et messages qui n’ont pas expiré. Aucune suppression définitive ni purge automatique n’est réalisée.
+
+Avant de déployer cette version sur Railway, appliquer `npm run db:migrate:deploy` avec la connexion opérateur PostgreSQL. La migration `20261015180000_lead_trash` ajoute le champ nullable `Lead.deletedAt` et complète les droits des rôles `nova_admin`/`nova_worker` existants. Pour des rôles portant d’autres noms, accorder `UPDATE ("deletedAt") ON "Lead"` à l’administration et `SELECT ("id", "deletedAt") ON "Lead"` au worker. Les scripts de création de nouveaux rôles incluent ces droits. Appliquer la migration avant de redéployer le site, l’administration et le worker.
+
+Le contrôle `npx tsx scripts/test-lead-pipeline.ts --trash-ui` utilise une base locale jetable et teste l’annulation, la suppression, les filtres de corbeille et la restauration à 375, 768, 1024 et 1440 pixels. Les captures sont enregistrées dans `reports/trash`.
+
 ## Sécurité et limites
 
 Chaque lecture et chaque mutation passe par le contrôle serveur ; le layout est un confort supplémentaire, pas la seule protection. Les actions sont validées avec Zod et les accès Prisma sont paramétrés. Les routes de création du site refusent les statuts privilégiés comme auparavant.
