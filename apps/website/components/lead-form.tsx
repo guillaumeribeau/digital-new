@@ -9,7 +9,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import {
   Check,
   LockKeyhole,
-  CircleCheck,
+  Mail,
   AlertCircle,
   LoaderCircle,
   Sparkles,
@@ -94,7 +94,7 @@ export function LeadForm({ enabled, antiBot }: { enabled: boolean; antiBot: Anti
         ? "instant"
         : "smooth",
     });
-  }, [step]);
+  }, [step, reference]);
   const field = (
     name: keyof Lead,
     label: string,
@@ -216,26 +216,30 @@ export function LeadForm({ enabled, antiBot }: { enabled: boolean; antiBot: Anti
   if (reference)
     return (
       <div className="form-success" role="status">
-        <CircleCheck size={54} />
-        <p className="eyebrow">DEMANDE ENREGISTRÉE</p>
-        <h1>
-          Votre projet
+        <Mail size={54} aria-hidden="true" />
+        <p className="eyebrow">DERNIÈRE ÉTAPE OBLIGATOIRE</p>
+        <h1 ref={title} tabIndex={-1}>
+          Confirmez votre
           <br />
-          commence ici.
+          adresse e-mail.
         </h1>
         <p>
-          Votre demande est enregistrée. L’envoi de votre lien de confirmation
-          est en attente de traitement. À réception, confirmez votre adresse
-          e-mail pour que notre équipe puisse examiner votre projet. Pensez
-          aussi à vérifier vos courriers indésirables.
+          Votre demande est enregistrée, en attente de votre confirmation.
+          Vous allez recevoir un e-mail à <strong className="lead-email-address">{getValues("email")}</strong>.
         </p>
+        <div className="lead-email-notice">
+          <strong>Votre confirmation est indispensable.</strong>
+          <p>Ouvrez l’e-mail « Confirmez votre demande de site — Zelyweb », cliquez sur le lien,
+            puis sur « Confirmer mon adresse e-mail » sur la page qui s’ouvre.
+            Votre demande sera prise en charge uniquement après cette validation.</p>
+        </div>
         <ol>
-          <li>Vous confirmez votre adresse avec le lien reçu par e-mail.</li>
-          <li>
-            Nous vous recontactons pour confirmer le périmètre et le délai.
-          </li>
-          <li>Nous préparons votre première proposition gratuite.</li>
+          <li><strong>Validez votre adresse e-mail.</strong> Le lien reçu est valable 24 heures.</li>
+          <li><strong>Recevez un second e-mail de confirmation.</strong> Il confirme que votre demande peut être prise en charge.</li>
+          <li><strong>Notre équipe examine votre projet</strong> et vous recontacte pour préparer votre première proposition gratuite.</li>
         </ol>
+        <p>Vous ne trouvez pas l’e-mail ? Patientez quelques minutes et vérifiez vos spams
+          ou courriers indésirables. Vous pouvez ensuite demander un nouveau lien ci-dessous.</p>
         <small>Référence : {reference}</small>
         <AntiBot key={"resend-" + challengeVersion} settings={antiBot} action="lead_resend" onToken={setTurnstileToken} />
         <button type="button" className="button" disabled={busy} onClick={async () => {
@@ -483,6 +487,13 @@ export function LeadForm({ enabled, antiBot }: { enabled: boolean; antiBot: Anti
                 autoComplete: "email",
                 placeholder: "vous@entreprise.fr",
               })}
+              <div className="lead-email-notice">
+                <strong>Une adresse e-mail à confirmer pour activer votre demande.</strong>
+                <p>Après l’envoi, vous recevrez un e-mail avec un lien de validation.
+                  Cette étape est obligatoire pour que votre demande soit prise en charge,
+                  même si vous préférez être contacté par téléphone.
+                  Un second e-mail vous confirmera ensuite la validation de votre demande.</p>
+              </div>
               {choices(
                 "contactMethod",
                 "Comment préférez-vous être contacté ?",

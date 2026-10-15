@@ -29,9 +29,14 @@ export function LeadVerification({ antiBot }: { antiBot: AntiBotSettings | null 
   }
   return <article className="container legal-content">
     <h1>{confirmed ? "Votre demande est confirmée." : "Confirmez votre demande."}</h1>
-    {confirmed ? <p role="status">Votre adresse e-mail est vérifiée. Notre équipe peut maintenant
-      examiner votre projet. Un accusé de réception est en attente d’envoi.</p> : <>
-      <p>Confirmez votre adresse e-mail pour nous permettre de traiter votre demande de première proposition gratuite.</p>
+    {confirmed ? <p role="status">Votre adresse e-mail est vérifiée et votre demande peut maintenant être prise en charge.
+      Vous allez recevoir un e-mail de confirmation. Notre équipe examinera votre projet et vous recontactera.</p> : <>
+      <div className="lead-email-notice">
+        <strong>Dernière étape obligatoire : validez votre adresse e-mail.</strong>
+        <p>Cliquez sur « Confirmer mon adresse e-mail » ci-dessous pour activer votre demande.
+          Notre équipe pourra la prendre en charge uniquement après cette validation.
+          Vous recevrez ensuite un e-mail de confirmation.</p>
+      </div>
       <button className="button" disabled={busy} onClick={confirm}>
         {busy ? "Confirmation…" : "Confirmer mon adresse e-mail"}</button>
       {message && <p role="alert">{message}</p>}

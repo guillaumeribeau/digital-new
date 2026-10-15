@@ -1,3 +1,27 @@
+.lead-email-notice {
+  padding: 20px;
+  margin-block: 20px;
+  border: 1px solid var(--blue);
+  border-left-width: 4px;
+  border-radius: 6px;
+  background: #edf1ff;
+  color: var(--ink);
+  text-align: left;
+  font-size: 14px;
+  line-height: 1.7;
+}
+.lead-email-notice > strong {
+  display: block;
+  color: var(--blue);
+  font-size: 16px;
+  margin-bottom: 8px;
+}
+.lead-email-notice p {
+  margin: 0;
+}
+.lead-email-address {
+  overflow-wrap: anywhere;
+}
 .lead-later-note {
   font-size: 12px;
   color: var(--muted);
