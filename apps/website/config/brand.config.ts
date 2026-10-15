@@ -7,9 +7,9 @@ type ContractConditions = {
  domainRenewal: string | null;
 };
 export const brand = {
-  name: "NOVA",
+  name: "Zelyweb",
   tagline: "Votre site internet, on s’occupe de tout.",
-  domain: process.env.NEXT_PUBLIC_SITE_URL || "",
+  domain: process.env.NEXT_PUBLIC_SITE_URL || "https://zelyweb.com",
   contactEmail: "",
   phone: "",
   socialLinks: [] as { label: string; url: string }[],
@@ -21,7 +21,7 @@ export const brand = {
     registrationNumber: "",
     vatNumber: "",
     publicationDirector: "",
-    hostingProvider: "Vercel (hébergeur envisagé, à confirmer)",
+    hostingProvider: "Railway",
   },
   pricing: {
     creation: 299,

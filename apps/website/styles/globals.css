@@ -77,18 +77,14 @@ a {
 .logo {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  font-family: var(--display);
-  font-size: 30px;
-  font-weight: 700;
-  letter-spacing: -1.8px;
+  width: 168px;
+  vertical-align: middle;
   line-height: 1;
 }
-.logo-dot {
-  font-size: 12px;
-  align-self: flex-start;
-  letter-spacing: 0;
-  margin-top: 3px;
+.logo img {
+  display: block;
+  width: 100%;
+  height: auto;
 }
 .header {
   position: sticky;
@@ -682,8 +678,11 @@ a {
   padding-bottom: 45px;
   align-items: flex-start;
 }
-.footer-top > .logo {
-  font-size: 35px;
+.footer-top .logo {
+  box-sizing: content-box;
+  background: var(--paper);
+  border-radius: 8px;
+  padding: 10px 14px;
 }
 .footer-top p {
   font-size: 14px;
@@ -841,10 +840,7 @@ a {
     height: 73px;
   }
   .logo {
-    font-size: 27px;
-  }
-  .logo svg {
-    width: 25px;
+    width: 144px;
   }
   .desktop-nav,
   .header-cta {

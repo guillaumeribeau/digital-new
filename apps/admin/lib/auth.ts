@@ -10,7 +10,7 @@ function createAuth() {
   const url = new URL(baseURL);
   if (process.env.NODE_ENV === "production" && url.protocol !== "https:") throw new Error("HTTPS_REQUIRED");
   return betterAuth({
-    appName: "NOVA Administration", baseURL, secret,
+    appName: "Zelyweb Administration", baseURL, secret,
     database: prismaAdapter(getDb(), { provider: "postgresql" }),
     trustedOrigins: [url.origin], logger: { disabled: true },
     emailAndPassword: { enabled: true, disableSignUp: true, minPasswordLength: 14,

@@ -1,4 +1,5 @@
 "use client";
+import { BrandLogo } from "./brand-logo";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { QuoteSnapshot } from "../lib/commercial-core";
 import { money } from "../lib/commercial-shared";
@@ -44,7 +45,7 @@ export function QuotePortal({ id }: { id: string }) {
     finally { setBusy(false); }
   }
   const snapshot = quote?.snapshot;
-  return <main id="main" className="quote-portal"><header><div className="brand-logo">N<span>O</span>VA</div><span className="eyebrow">VOTRE DEVIS COMPLÉMENTAIRE</span></header>
+  return <main id="main" className="quote-portal"><header><div className="brand-logo"><BrandLogo /></div><span className="eyebrow">VOTRE DEVIS COMPLÉMENTAIRE</span></header>
     {error && <p className="notice error" role="alert">{error}</p>}
     {!snapshot ? !error && <p>Chargement de votre devis…</p> : <>
       <section className="panel"><p className="eyebrow">{snapshot.number}</p><h1>{snapshot.title}</h1><p>{snapshot.seller.legalName} · Pour {snapshot.buyer.company}</p>

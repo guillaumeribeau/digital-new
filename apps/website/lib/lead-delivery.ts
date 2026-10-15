@@ -13,7 +13,7 @@ export const emailPayloadSchema = z.object({
   reply_to: z.email().optional(),
 });
 export type EmailPayload = z.infer<typeof emailPayloadSchema>;
-const sender = () => localEmailMode() ? "NOVA Local <no-reply@nova.test>" : process.env.LEAD_FROM_EMAIL!;
+const sender = () => localEmailMode() ? "Zelyweb Local <no-reply@nova.test>" : process.env.LEAD_FROM_EMAIL!;
 export function verificationEmail(lead: Pick<StoredLead, "fullName" | "email" | "id">, token: string): EmailPayload {
   const link = new URL("/confirmer-demande", process.env.NEXT_PUBLIC_SITE_URL);
   link.hash = "token=" + token;

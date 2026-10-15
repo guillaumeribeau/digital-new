@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { turnstileConfig } from "@/lib/anti-bot";
 import "@/styles/lead-form.css";
 export const metadata: Metadata = {
-  title: "Confirmer votre demande — NOVA",
+  title: "Confirmer votre demande",
   robots: { index: false, follow: false },
   referrer: "no-referrer",
 };

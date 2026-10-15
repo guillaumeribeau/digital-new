@@ -3,7 +3,7 @@ import { brand } from "@/config/brand.config";
 import { pageMetadata } from "@/lib/seo";
 export const metadata = pageMetadata(
   "Mentions légales",
-  "Informations légales du site NOVA. Identité de l’éditeur et coordonnées à compléter avant publication.",
+  "Informations légales du site Zelyweb. Identité de l’éditeur et coordonnées à compléter avant publication.",
   "/mentions-legales",
 );
 export default function Legal() {
@@ -16,7 +16,7 @@ export default function Legal() {
       />
       <article className="container legal-content">
         <div className="pending-box">
-          <strong>NOVA est un nom provisoire.</strong>
+          <strong>Informations sur l’éditeur de Zelyweb à compléter.</strong>
           <p>
             L’identité juridique de l’entreprise n’est pas encore renseignée.
             Les indications « À renseigner » ne constituent pas des informations

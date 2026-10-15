@@ -22,7 +22,7 @@ export function paymentMode() {
 export function sender() {
   const value = process.env.COMMERCIAL_FROM_EMAIL;
   if (value) return value;
-  if (commercialLocal()) return "NOVA Local <no-reply@nova.test>";
+  if (commercialLocal()) return "Zelyweb Local <no-reply@nova.test>";
   throw new CommercialError("CONFIGURATION_REQUIRED");
 }
 export function replyAddress(token: string) {

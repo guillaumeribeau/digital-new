@@ -46,7 +46,7 @@ export function Footer() {
       </div>
       <div className="container footer-bottom">
         <span>
-          © {new Date().getFullYear()} {brand.name} · Marque provisoire
+          © {new Date().getFullYear()} {brand.name}
         </span>
         <nav aria-label="Informations légales">
           <Link href="/mentions-legales">Mentions légales</Link>
