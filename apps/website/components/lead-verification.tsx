@@ -1,46 +1,80 @@
 "use client";
-import { useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { CircleCheck, AlertCircle, LoaderCircle } from "lucide-react";
 import { AntiBot, type AntiBotSettings } from "./anti-bot";
+
+type VerificationResult = { confirmed: boolean; error?: string };
+async function verifyToken(token: string): Promise<VerificationResult> {
+  if (!/^[A-Za-z0-9_-]{43}$/.test(token)) {
+    return { confirmed: false, error: "Le lien de confirmation est incomplet. Ouvrez le lien reçu par e-mail ou demandez-en un nouveau." };
+  }
+  try {
+    const response = await fetch("/api/leads/verify", { method: "POST",
+      headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token }),
+      signal: AbortSignal.timeout(25000) });
+    const result = await response.json();
+    if (response.ok && result.success) return { confirmed: true };
+    return { confirmed: false, error: result.error || "La confirmation est temporairement indisponible. Réessayez." };
+  } catch {
+    return { confirmed: false, error: "La confirmation est temporairement indisponible. Vérifiez votre connexion et réessayez." };
+  }
+}
 
 export function LeadVerification({ antiBot }: { antiBot: AntiBotSettings | null }) {
   const [turnstileToken, setTurnstileToken] = useState("");
   const [challengeVersion, setChallengeVersion] = useState(0);
   const token = useRef("");
+  const request = useRef<Promise<VerificationResult> | null>(null);
   const [busy, setBusy] = useState(false);
-  const [confirmed, setConfirmed] = useState(false);
+  const [status, setStatus] = useState<"checking" | "confirmed" | "error">("checking");
+  const [canRetry, setCanRetry] = useState(false);
   const [message, setMessage] = useState("");
   const [resendMessage, setResendMessage] = useState("");
-  useLayoutEffect(() => {
-    if (!token.current) token.current = new URLSearchParams(window.location.hash.slice(1)).get("token") || "";
-    window.history.replaceState(null, "", window.location.pathname);
+  useEffect(() => {
+    if (!request.current) {
+      token.current = new URLSearchParams(window.location.hash.slice(1)).get("token") || "";
+      window.history.replaceState(null, "", window.location.pathname);
+      request.current = verifyToken(token.current);
+    }
+    // Reuse the in-flight request during React's development effect replay.
+    // A single click must only consume the one-time token once.
+    let active = true;
+    request.current.then((result) => {
+      if (!active) return;
+      setStatus(result.confirmed ? "confirmed" : "error");
+      setMessage(result.error || "");
+      setCanRetry(!result.confirmed && /^[A-Za-z0-9_-]{43}$/.test(token.current));
+      if (result.confirmed) token.current = "";
+    });
+    return () => { active = false; };
   }, []);
   async function confirm() {
-    setBusy(true);
-    try {
-      const response = await fetch("/api/leads/verify", { method: "POST",
-        headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token: token.current }),
-        signal: AbortSignal.timeout(25000) });
-      const result = await response.json();
-      if (response.ok && result.success) { setConfirmed(true); token.current = ""; }
-      else setMessage(result.error || "La confirmation est temporairement indisponible.");
-    } catch { setMessage("La confirmation est temporairement indisponible. Réessayez."); }
-    finally { setBusy(false); }
+    setStatus("checking");
+    const result = await verifyToken(token.current);
+    setStatus(result.confirmed ? "confirmed" : "error");
+    setMessage(result.error || "");
+    if (result.confirmed) token.current = "";
   }
-  return <article className="container legal-content">
-    <h1>{confirmed ? "Votre demande est confirmée." : "Confirmez votre demande."}</h1>
-    {confirmed ? <p role="status">Votre adresse e-mail est vérifiée et votre demande peut maintenant être prise en charge.
-      Vous allez recevoir un e-mail de confirmation. Notre équipe examinera votre projet et vous recontactera.</p> : <>
-      <div className="lead-email-notice">
-        <strong>Dernière étape obligatoire : validez votre adresse e-mail.</strong>
-        <p>Cliquez sur « Confirmer mon adresse e-mail » ci-dessous pour activer votre demande.
-          Notre équipe pourra la prendre en charge uniquement après cette validation.
-          Vous recevrez ensuite un e-mail de confirmation.</p>
+  return <article className="container lead-verification">
+    <div className="lead-verification-card" aria-busy={status === "checking"}>
+      <div className={"lead-verification-icon " + status} aria-hidden="true">
+        {status === "checking" ? <LoaderCircle className="spinner" size={34} /> : status === "confirmed" ? <CircleCheck size={34} /> : <AlertCircle size={34} />}
       </div>
-      <button className="button" disabled={busy} onClick={confirm}>
-        {busy ? "Confirmation…" : "Confirmer mon adresse e-mail"}</button>
+      <p className="eyebrow">{status === "confirmed" ? "ON PREND LE RELAIS" : status === "checking" ? "UN INSTANT…" : "VÉRIFIONS VOTRE LIEN"}</p>
+      <h1>{status === "confirmed" ? "Votre demande est confirmée." : status === "checking" ? "Nous validons votre demande…" : "La validation n’a pas abouti."}</h1>
+      {status === "checking" && <p role="status">La confirmation se fait automatiquement. Vous n’avez rien d’autre à faire.</p>}
+    {status === "confirmed" && <div role="status">
+      <p>Votre adresse e-mail est vérifiée. Notre équipe peut maintenant prendre en charge votre projet.</p>
+      <div className="lead-email-notice"><strong>Votre e-mail de confirmation va suivre.</strong>
+        <p>Nous vous envoyons un récapitulatif de cette validation. Notre équipe examinera votre demande et vous recontactera pour la suite.</p></div>
+    </div>}
+    {status === "error" && <>
       {message && <p role="alert">{message}</p>}
-      <h2>Besoin d’un nouveau lien ?</h2>
+      {canRetry && <button className="button" disabled={busy} onClick={confirm}>Réessayer la validation</button>}
+      <details className="lead-verification-recovery">
+      <summary>Recevoir un nouveau lien</summary>
+      <p>Indiquez la référence de votre demande et l’adresse e-mail utilisée dans le formulaire.</p>
       <form onSubmit={async (event) => {
         event.preventDefault();
         const data = new FormData(event.currentTarget);
@@ -64,7 +98,9 @@ export function LeadVerification({ antiBot }: { antiBot: AntiBotSettings | null 
         <button className="button" disabled={busy}>Demander un nouveau lien</button>
       </form>
       {resendMessage && <p role="status">{resendMessage}</p>}
+      </details>
     </>}
-    <p><Link href="/">Revenir à l’accueil</Link></p>
+    <Link className="button lead-verification-home" href="/">Revenir à l’accueil</Link>
+    </div>
   </article>;
 }

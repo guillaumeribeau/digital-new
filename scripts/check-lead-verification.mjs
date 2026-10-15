@@ -12,7 +12,7 @@ try {
   for (const width of [375, 768, 1024, 1440]) {
     const page = await browser.newPage({ viewport: { width, height: 1000 }, reducedMotion: "reduce" });
     page.on("pageerror", (error) => errors.push(error.message));
-    let calls = 0, success = false;
+    let calls = 0, success = true;
     const token = "a".repeat(43);
     await page.route("**/api/leads/verify", async (route) => {
       calls++;
@@ -24,9 +24,19 @@ try {
       body: JSON.stringify({ success: true, message: "Si une demande correspond, un lien sera envoyé." }) }));
     await page.goto(base + "/confirmer-demande#token=" + token);
     await page.waitForFunction(() => !window.location.hash);
-    assert.equal(calls, 0, "Aucun jeton consommé automatiquement");
-    await page.getByRole("button", { name: "Confirmer mon adresse e-mail" }).click();
+    await page.getByRole("heading", { name: "Votre demande est confirmée." }).waitFor();
+    assert.equal(calls, 1, "Le lien consomme le jeton une seule fois, sans second clic");
+    assert.equal(await page.getByRole("button", { name: "Confirmer mon adresse e-mail" }).count(), 0);
+    assert.equal(await page.locator('.anti-bot').count(), 0, "Aucun défi supplémentaire après la validation");
+    assert.equal(await page.locator('form').count(), 0);
+    assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+    await page.screenshot({ path: `reports/verification/confirmed-${width}.png`, fullPage: true });
+    success = false;
+    await page.goto("about:blank");
+    await page.goto(base + "/confirmer-demande#token=" + token);
     await page.getByRole("alert").filter({ hasText: "Lien de contrôle expiré." }).waitFor();
+    assert.equal(calls, 2);
+    await page.getByText("Recevoir un nouveau lien", { exact: true }).click();
     await page.getByLabel("Référence de votre demande").fill("7a17bfde-1754-40bf-a5cd-1a353b69e3cb");
     await page.getByLabel("Votre adresse e-mail").fill("fictif@example.com");
     await page.locator('.anti-bot[data-verified="true"]').waitFor();
@@ -35,11 +45,15 @@ try {
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
     await page.screenshot({ path: `reports/verification/confirmation-${width}.png`, fullPage: true });
     success = true;
-    await page.getByRole("button", { name: "Confirmer mon adresse e-mail" }).click();
+    await page.getByRole("button", { name: "Réessayer la validation" }).click();
     await page.getByRole("heading", { name: "Votre demande est confirmée." }).waitFor();
-    assert.equal(calls, 2);
+    assert.equal(calls, 3);
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
-    results.push({ width, explicitConfirmation: true, tokenRemoved: true, resend: true, success: true });
+    await page.goto("about:blank");
+    await page.goto(base + "/confirmer-demande");
+    await page.getByRole("alert").filter({ hasText: "Le lien de confirmation est incomplet." }).waitFor();
+    assert.equal(calls, 3, "Aucun appel API sans jeton valide");
+    results.push({ width, automaticConfirmation: true, tokenRemoved: true, resend: true, success: true, missingToken: true });
     await page.close();
   }
   const context = await browser.newContext();
@@ -52,5 +66,5 @@ try {
   await context.close();
   assert.deepEqual(errors, []);
   await writeFile("reports/verification/checks.json", JSON.stringify({ results, errors, unauthorizedReads: "405" }, null, 2));
-  console.log("Confirmation : 4 largeurs, fragment retiré, action explicite, renvoi, erreurs et accès interdits — OK.");
+  console.log("Confirmation : 4 largeurs, validation automatique unique, fragment retiré, renvoi, erreurs et accès interdits — OK.");
 } finally { await browser.close(); }

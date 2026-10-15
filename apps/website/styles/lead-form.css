@@ -1,3 +1,62 @@
+.lead-verification {
+  padding-block: 64px;
+}
+.lead-verification-card {
+  max-width: 680px;
+  margin-inline: auto;
+  padding: clamp(24px, 5vw, 48px);
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  text-align: center;
+}
+.lead-verification-icon {
+  display: grid;
+  place-items: center;
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  margin: 0 auto 24px;
+  color: var(--blue);
+  background: #edf1ff;
+}
+.lead-verification-icon.confirmed {
+  background: var(--yellow);
+  color: var(--ink);
+}
+.lead-verification .eyebrow {
+  justify-content: center;
+  color: var(--blue);
+}
+.lead-verification h1 {
+  font-family: var(--display);
+  font-size: clamp(32px, 4vw, 48px);
+  line-height: 1.15;
+  letter-spacing: -1.5px;
+  margin: 20px 0;
+}
+.lead-verification p {
+  font-size: 15px;
+  line-height: 1.8;
+}
+.lead-verification-home {
+  margin-top: 20px;
+}
+.lead-verification-recovery {
+  text-align: left;
+  margin-top: 28px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+}
+.lead-verification-recovery summary {
+  cursor: pointer;
+  color: var(--blue);
+  font-weight: 600;
+}
+.lead-verification-recovery input {
+  width: 100%;
+  min-width: 0;
+}
 .lead-email-notice {
   padding: 20px;
   margin-block: 20px;

@@ -229,9 +229,9 @@ export function LeadForm({ enabled, antiBot }: { enabled: boolean; antiBot: Anti
         </p>
         <div className="lead-email-notice">
           <strong>Votre confirmation est indispensable.</strong>
-          <p>Ouvrez l’e-mail « Confirmez votre demande de site — Zelyweb », cliquez sur le lien,
-            puis sur « Confirmer mon adresse e-mail » sur la page qui s’ouvre.
-            Votre demande sera prise en charge uniquement après cette validation.</p>
+          <p>Ouvrez l’e-mail « Confirmez votre demande de site — Zelyweb » et cliquez sur
+            « Confirmer ma demande ». Ce seul clic valide votre adresse e-mail et permet
+            à notre équipe de prendre en charge votre projet.</p>
         </div>
         <ol>
           <li><strong>Validez votre adresse e-mail.</strong> Le lien reçu est valable 24 heures.</li>

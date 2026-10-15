@@ -3,6 +3,7 @@ import { brand } from "../config/brand.config";
 import { leadStyleLabels } from "./lead-schema";
 import type { Lead as StoredLead } from "@nova/database";
 import { localEmailMode } from "./local-email";
+import { escapeEmailHtml, leadEmailTemplate } from "./lead-email-template";
 
 export class DeliveryUnavailable extends Error {}
 export function emailConfigured() {
@@ -10,6 +11,7 @@ export function emailConfigured() {
 }
 export const emailPayloadSchema = z.object({
   from: z.string(), to: z.array(z.email()).min(1), subject: z.string(), text: z.string(),
+  html: z.string().optional(),
   reply_to: z.email().optional(),
 });
 export type EmailPayload = z.infer<typeof emailPayloadSchema>;
@@ -19,6 +21,17 @@ export function verificationEmail(lead: Pick<StoredLead, "fullName" | "email" | 
   link.hash = "token=" + token;
   return { from: sender(), to: [lead.email],
     subject: "Confirmez votre demande de site — " + brand.name,
+    html: leadEmailTemplate({
+      preview: "Un clic pour confirmer votre demande et nous permettre de découvrir votre projet.",
+      label: "Votre futur site commence ici",
+      title: "Un clic, et votre projet peut commencer.",
+      introduction: `Bonjour ${lead.fullName},`,
+      content: `<p style="margin:0 0 20px;font-size:15px;line-height:1.8;color:#41423c;">Nous avons bien enregistré votre demande de site. Cliquez sur le bouton ci-dessous pour confirmer votre adresse e-mail et nous permettre de prendre en charge votre projet.</p>`,
+      afterAction: `<table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td bgcolor="#f4f6eb" style="padding:18px;border-left:3px solid #d4e92d;font-size:14px;line-height:1.8;"><strong>La suite est simple.</strong><br>Votre demande sera validée dès l’ouverture du lien. Vous recevrez ensuite un second e-mail de confirmation.</td></tr></table>
+        <p style="margin:18px 0;font-size:12px;line-height:1.8;color:#585952;">Ce lien personnel est valable 24 heures et utilisable une seule fois. Si vous n’êtes pas à l’origine de cette demande, ignorez cet e-mail.</p>`,
+      reference: lead.id,
+      action: { label: "Confirmer ma demande", url: link.href },
+    }),
     text: `Bonjour ${lead.fullName},\n\nVotre demande est enregistrée. Confirmez votre adresse e-mail pour que notre équipe puisse la traiter :\n${link}\n\nCe lien est valable 24 heures et utilisable une seule fois. Si vous n’avez pas fait cette demande, ignorez cet e-mail.\n\nPremière proposition gratuite. Création : 299 € HT après validation. Gestion technique : 29 € HT/mois, sans engagement de durée. Aucun paiement à cette étape.\n\nRéférence : ${lead.id}\n\n${brand.name}` };
 }
 export function verifiedEmails(lead: StoredLead): { receipt: EmailPayload; internal: EmailPayload } {
@@ -34,6 +47,18 @@ export function verifiedEmails(lead: StoredLead): { receipt: EmailPayload; inter
   ].map(([label, value]) => `${label} : ${value || "Non renseigné"}`).join("\n");
   return {
     receipt: { from, to: [lead.email], subject: "Votre demande est confirmée — " + brand.name,
+      html: leadEmailTemplate({
+        preview: "Votre adresse e-mail est validée. Notre équipe peut maintenant examiner votre projet.",
+        label: "C’est confirmé, on prend le relais",
+        title: "Votre demande est entre de bonnes mains.",
+        introduction: `Bonjour ${lead.fullName},`,
+        content: `<p style="margin:0 0 20px;font-size:15px;line-height:1.8;color:#41423c;">Votre adresse e-mail est vérifiée et votre demande pour <strong>${escapeEmailHtml(lead.businessName)}</strong> est confirmée. Vous n’avez plus rien à valider.</p>
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td bgcolor="#f4f6eb" style="padding:20px;border-left:3px solid #d4e92d;">
+          <p style="margin:0 0 12px;font-size:15px;line-height:1.6;font-weight:bold;">Et maintenant ?</p>
+          <p style="margin:0;font-size:14px;line-height:1.9;">01 &nbsp; Nous découvrons votre activité et vos envies.<br>02 &nbsp; Nous vous recontactons pour préciser votre projet.<br>03 &nbsp; Nous préparons votre première proposition gratuite.</p></td></tr></table>
+          <p style="margin:20px 0 0;font-size:14px;line-height:1.8;color:#41423c;">Vous découvrez la proposition, puis vous décidez. Aucun paiement ne vous est demandé à cette étape.</p>`,
+        reference: lead.id,
+      }),
       text: `Bonjour ${lead.fullName},\n\nVotre adresse e-mail est vérifiée et votre demande pour ${lead.businessName} est confirmée. Notre équipe va examiner votre projet et vous recontacter. La première proposition est gratuite ; aucun paiement n’est demandé à cette étape.\n\nRéférence : ${lead.id}\n\nÀ bientôt,\n${brand.name}` },
     internal: { from, to: [localEmailMode() ? "equipe@nova.test" : process.env.LEAD_TO_EMAIL!], reply_to: lead.email,
       subject: "Nouvelle demande vérifiée — " + brand.name,
