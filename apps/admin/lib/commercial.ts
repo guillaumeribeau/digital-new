@@ -1,3 +1,4 @@
+import { business, withSellerDefaults } from "@nova/shared/business";
 import { getDb, Prisma, type Quote } from "@nova/database";
 import { randomBytes, randomUUID } from "node:crypto";
 import { z } from "zod";
@@ -18,9 +19,9 @@ function configured() {
 export async function buildSnapshot(quote: Quote) {
   if (quote.snapshot) return snapshotSchema.parse(quote.snapshot);
   const db = getDb(), [settings, lead] = await Promise.all([db.commercialSettings.findUnique({ where: { id: "main" } }), db.lead.findUniqueOrThrow({ where: { id: quote.leadId } })]);
-  if (!settings) throw new CommercialError("SELLER_REQUIRED");
+  const seller = { ...withSellerDefaults(settings), email: business.email };
   const result = snapshotSchema.safeParse({ number: quote.number, title: quote.title, createdAt: quote.createdAt.toISOString(), validUntil: quote.validUntil.toISOString(),
-    deliveryTime: quote.deliveryTime, terms: quote.terms, seller: settings,
+    deliveryTime: quote.deliveryTime, terms: quote.terms, seller,
     buyer: { company: quote.billingName || lead.businessName, name: lead.fullName, email: lead.email, address: quote.billingAddress, registrationNumber: quote.billingRegistrationNumber, vatNumber: quote.billingVatNumber },
     items: quote.items, subtotalCents: quote.subtotalCents, taxCents: quote.taxCents, totalCents: quote.totalCents });
   if (!result.success) throw new CommercialError("SELLER_REQUIRED");
@@ -41,7 +42,7 @@ export const commercialService = {
       quotes: { orderBy: { createdAt: "desc" }, take: 100, include: { payments: { orderBy: { createdAt: "desc" }, take: 20 }, emails: { select: { status: true }, take: 1, orderBy: { createdAt: "desc" } } } },
     } });
   },
-  async settings(headers: Headers) { await authenticate(headers); return getDb().commercialSettings.findUnique({ where: { id: "main" } }); },
+  async settings(headers: Headers) { await authenticate(headers); return withSellerDefaults(await getDb().commercialSettings.findUnique({ where: { id: "main" } })); },
   async saveSettings(headers: Headers, input: unknown) {
     await authenticate(headers); const data = settingsInput.parse(input);
     return getDb().$transaction(async (tx) => {

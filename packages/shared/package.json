@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "exports": {
-    ".": "./index.ts"
+    ".": "./index.ts",
+    "./business": "./business.ts"
   }
 }

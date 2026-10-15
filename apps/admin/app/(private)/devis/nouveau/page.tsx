@@ -1,3 +1,4 @@
+import { business } from "@nova/shared/business";
 import { requireAdmin } from "../../../../lib/access";
 import Link from "next/link";
 import { headers } from "next/headers";
@@ -12,7 +13,7 @@ export default async function NewQuote({ searchParams }: { searchParams: Promise
   const query = await searchParams, h = await headers(); if (!z.uuid().safeParse(query.client).success) notFound();
   const client = await commercialService.client(h, query.client!); if (!client) notFound();
   const [settings, templates] = await Promise.all([commercialService.settings(h), commercialService.templates(h)]);
-  let initial: QuoteEditorInitial = { title: "", billingName: client.businessName, billingAddress: "", billingRegistrationNumber: "", billingVatNumber: "", deliveryTime: "", terms: settings?.terms || "", validityDays: settings?.validityDays || 30, items: [{ label: "", description: "", quantity: 1, unitPrice: "", taxBasisPoints: 0 }] };
+  let initial: QuoteEditorInitial = { title: "", billingName: client.businessName, billingAddress: "", billingRegistrationNumber: "", billingVatNumber: "", deliveryTime: "", terms: settings?.terms || "", validityDays: settings?.validityDays || 30, items: [{ label: "", description: "", quantity: 1, unitPrice: "", taxBasisPoints: business.taxBasisPoints }] };
   const previousId = query.modifier || query.revision;
   if (previousId) {
     if (!z.uuid().safeParse(previousId).success) notFound();

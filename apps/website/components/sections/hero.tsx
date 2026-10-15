@@ -295,17 +295,19 @@ export function Hero() {
                 <strong>
                   {brand.pricing.creation} € <small>HT</small>
                 </strong>
+                <span className="rx-rate-ttc">358,80 € TTC</span>
               </li>
               <li className="rx-rate">
                 <span className="rx-rate-label">La gestion technique</span>
                 <strong>
                   {brand.pricing.monthly} € <small>HT/mois</small>
                 </strong>
+                <span className="rx-rate-ttc">34,80 € TTC/mois</span>
               </li>
             </ul>
             <p className="rx-terms">
               Vous payez la création uniquement si vous commandez après
-              validation de la proposition.
+              validation de la première version complète. Abonnement requis à la publication, sans durée minimale.
             </p>
           </div>
           <div className="rx-zero" aria-hidden="true">

@@ -1,3 +1,4 @@
+import { business, offer } from "@nova/shared/business";
 type ContractConditions = {
  commitment: string | null;
  cancellation: string | null;
@@ -10,29 +11,29 @@ export const brand = {
   name: "Zelyweb",
   tagline: "Votre site internet, on s’occupe de tout.",
   domain: process.env.NEXT_PUBLIC_SITE_URL || "https://zelyweb.com",
-  contactEmail: "",
-  phone: "",
+  contactEmail: business.email,
+  phone: business.phone as string,
   socialLinks: [] as { label: string; url: string }[],
   legalIdentity: {
-    companyName: "",
-    legalForm: "",
+    companyName: business.legalName,
+    legalForm: business.legalForm,
     capital: "",
-    address: "",
-    registrationNumber: "",
-    vatNumber: "",
-    publicationDirector: "",
+    address: business.address,
+    registrationNumber: business.siret,
+    vatNumber: business.vatNumber,
+    publicationDirector: "Guillaume Ribeau",
     hostingProvider: "Railway",
   },
   pricing: {
-    creation: 299,
-    monthly: 29,
+    creation: offer.creationCents / 100,
+    monthly: offer.monthlyCents / 100,
     currency: "EUR",
-    commitment: null,
-    cancellation: null,
-    includedRevisions: null,
-    support: null,
-    transfer: null,
-    domainRenewal: null,
+    commitment: "Sans durée minimale ; abonnement requis à la mise en ligne",
+    cancellation: "À tout moment, à la fin de la période mensuelle déjà payée",
+    includedRevisions: 3,
+    support: "Une modification regroupée de 15 minutes maximum par mois, non reportable",
+    transfer: "Fichiers et code de transfert gratuits ; migration facultative à 150 € HT",
+    domainRenewal: "20 € HT/an inclus ; supplément annuel accepté au préalable au-delà",
   } satisfies ContractConditions & { creation: number; monthly: number; currency: string },
 };
 export const firstYearTotal =

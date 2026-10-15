@@ -31,8 +31,8 @@ export function HomeContent() {
               faites, ce qui vous distingue et comment vous contacter.
             </p>
             <p className="nh-body">
-              Votre site rassemble l’essentiel de votre activité dans une page
-              claire, soignée et facile à consulter. Vous nous parlez de votre
+              Votre site rassemble l’essentiel de votre activité dans cinq pages
+              claires, soignée et facile à consulter. Vous nous parlez de votre
               métier. Nous lui donnons une présence en ligne.
             </p>
             <Link className="nh-inline-link" href="/notre-offre">
@@ -120,7 +120,7 @@ export function HomeContent() {
                 {
                   Icon: Globe,
                   title: "Votre adresse sur le web",
-                  text: "Un nom de domaine standard, enregistré à votre nom avec les informations et la validation nécessaires.",
+                  text: "Un domaine choisi ensemble, géré et payé par Zelyweb jusqu’à 20 € HT/an. Supplément annuel soumis à votre accord au-delà.",
                 },
                 {
                   Icon: Server,
@@ -130,7 +130,7 @@ export function HomeContent() {
                 {
                   Icon: Wrench,
                   title: "La gestion technique",
-                  text: "La maintenance dans le périmètre convenu. Les conditions et le support sont précisés avant votre commande.",
+                  text: "Hébergement, domaine et une modification de 15 minutes maximum par mois. L’abonnement commence à la publication.",
                 },
               ].map(({ Icon, title, text }, i) => (
                 <Reveal className="nh-service-row" key={title}>

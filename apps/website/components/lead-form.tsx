@@ -541,9 +541,7 @@ export function LeadForm({ enabled, antiBot }: { enabled: boolean; antiBot: Anti
                     aria-invalid={!!errors.pricingAcknowledged}
                     aria-describedby={errors.pricingAcknowledged ? "pricingAcknowledged-error" : undefined} />
                   <span>J’ai pris connaissance des tarifs : première proposition gratuite,
-                    création à 299 € HT payable après validation, puis gestion technique
-                    à 29 € HT/mois, sans engagement de durée. Domaine, hébergement
-                    et mise en ligne pris en charge.</span>
+                    création de cinq pages à 299 € HT (358,80 € TTC) après acceptation, puis abonnement obligatoire à la publication à 29 € HT (34,80 € TTC)/mois, résiliable à tout moment. Hébergement, domaine jusqu’à 20 € HT/an et une modification de 15 min maximum par mois inclus.</span>
                 </label>
                 <FieldError name="pricingAcknowledged" message={errors.pricingAcknowledged?.message} />
                 <label>
@@ -563,6 +561,7 @@ export function LeadForm({ enabled, antiBot }: { enabled: boolean; antiBot: Anti
                 <Link href="/politique-confidentialite" target="_blank">
                   Lire la politique de confidentialité (nouvel onglet)
                 </Link>
+                <Link href="/conditions-generales" target="_blank">Lire les conditions de l’offre (nouvel onglet)</Link>
                 <FieldError name="consent" message={errors.consent?.message} />
               </div>
             </div>

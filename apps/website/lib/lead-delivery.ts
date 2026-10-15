@@ -32,7 +32,7 @@ export function verificationEmail(lead: Pick<StoredLead, "fullName" | "email" | 
       reference: lead.id,
       action: { label: "Confirmer ma demande", url: link.href },
     }),
-    text: `Bonjour ${lead.fullName},\n\nVotre demande est enregistrée. Confirmez votre adresse e-mail pour que notre équipe puisse la traiter :\n${link}\n\nCe lien est valable 24 heures et utilisable une seule fois. Si vous n’avez pas fait cette demande, ignorez cet e-mail.\n\nPremière proposition gratuite. Création : 299 € HT après validation. Gestion technique : 29 € HT/mois, sans engagement de durée. Aucun paiement à cette étape.\n\nRéférence : ${lead.id}\n\n${brand.name}` };
+    text: `Bonjour ${lead.fullName},\n\nVotre demande est enregistrée. Confirmez votre adresse e-mail pour que notre équipe puisse la traiter :\n${link}\n\nCe lien est valable 24 heures et utilisable une seule fois. Si vous n’avez pas fait cette demande, ignorez cet e-mail.\n\nPremière version complète de cinq pages gratuite sur aperçu privé. Création : 299 € HT (358,80 € TTC) après acceptation. Abonnement obligatoire à la mise en ligne : 29 € HT (34,80 € TTC)/mois, sans durée minimale. Aucun paiement à cette étape.\n\nRéférence : ${lead.id}\n\n${brand.name}` };
 }
 export function verifiedEmails(lead: StoredLead): { receipt: EmailPayload; internal: EmailPayload } {
   const from = sender();

@@ -4,7 +4,7 @@ Le module est intégré à l’administration et à PostgreSQL. Resend assure le
 
 ## Utilisation
 
-1. Ouvrir `/parametres/commercial` et renseigner votre entreprise, l’immatriculation, les mentions fiscales, les conditions et les délais. Ajouter vos prestations et modèles de messages si souhaité.
+1. Ouvrir `/parametres/commercial` et vérifier votre entreprise, l’immatriculation, les mentions fiscales, les conditions et les délais. Les champs manquants reprennent les informations de Guillaume Ribeau EI / Zelyweb ; les valeurs enregistrées restent prioritaires. Le bouton « Reprendre les informations et conditions Zelyweb » permet de préremplir un formulaire existant, puis de l’enregistrer. Ajouter vos prestations et modèles de messages si souhaité.
 2. Ouvrir `/clients`, puis une fiche client confirmé. Les échanges, devis et paiements sont regroupés dans cette fiche. `/echanges` présente les conversations et les réponses à traiter.
 3. Écrire au client depuis sa fiche. Son bouton « Répondre » habituel dans son logiciel de messagerie utilise une adresse propre à la conversation ; les réponses apparaissent ensuite dans l’administration.
 4. Créer un devis complémentaire : adresse de facturation, prestations, quantités, prix HT, TVA, délai et conditions. Vérifier le PDF, puis envoyer.
@@ -14,6 +14,18 @@ Le module est intégré à l’administration et à PostgreSQL. Resend assure le
 Un devis envoyé est figé, y compris son émetteur et ses conditions. Pour le changer avant acceptation, créer une nouvelle version : l’ancien lien est révoqué. Un devis accepté ou payé ne se réécrit pas. L’acceptation conserve le nom, la date et l’empreinte du document ; ce mécanisme n’est pas présenté comme une signature électronique qualifiée.
 
 Les montants sont en EUR, calculés en centimes côté serveur. Cette version prend en charge des quantités entières et un règlement intégral ; acomptes, remboursements et facturation comptable ne sont pas inclus.
+
+## Informations Zelyweb et offre publiée
+
+`packages/shared/business.ts` contient les coordonnées publiques, les conditions de l’offre et les valeurs par défaut utilisées par le site et l’administration. Les nouvelles lignes de devis et de catalogue proposent une TVA de 20 % ; les lignes existantes et les instantanés des devis envoyés sont conservés. Les PDF incorporent le logo local `packages/commercial/assets/zelyweb-logo.png`, inclus dans les traces de déploiement avec la police, sans téléchargement externe à la génération.
+
+L’offre de cinq pages et ses conditions sont accessibles sur `/conditions-generales` : création 299 € HT / 358,80 € TTC ; abonnement obligatoire à la publication 29 € HT / 34,80 € TTC, sans durée minimale ; domaine jusqu’à 20 € HT/an ; trois séries de retours sous 30 jours ; une modification de 15 minutes maximum par mois ; remise gratuite des fichiers et du code de transfert ; migration facultative à 150 € HT / 180 € TTC vers un environnement compatible. Le parcours initial et la facturation récurrente ne sont pas automatisés par cette mise à jour.
+
+Téléphone professionnel et médiateur de la consommation restent à compléter. Ne pas déclarer d’adhésion fictive. Avant les contrats consommateurs, finaliser ces coordonnées et remettre les informations contractuelles ; une exécution anticipée exige une demande expresse distincte, aucune renonciation automatique n’est ajoutée au portail. Les régions de traitement et garanties internationales des fournisseurs restent à vérifier dans les comptes utilisés.
+
+Les durées de conservation sont une politique **manuelle** : demandes non confirmées 30 jours, demandes sans suite 12 mois après le dernier échange, copie du site 30 jours après la fin du service. Aucune purge automatique ni migration de base n’est ajoutée. La corbeille n’est pas une suppression définitive. Appliquer les échéances aux données et copies concernées en préservant les archives soumises à une obligation légale distincte.
+
+Sources vérifiées le 15 octobre 2026 : [mentions obligatoires](https://entreprendre.service-public.gouv.fr/vosdroits/F37351), [vente à distance et rétractation](https://entreprendre.service-public.gouv.fr/vosdroits/F23455), [médiation de la consommation](https://www.economie.gouv.fr/mediation-conso/vous-etes-un-professionnel/vos-principales-obligations-0), [coordonnées Railway](https://railway.com/legal/terms) et [traitements Railway](https://railway.com/legal/dpa).
 
 ## Essai local prêt à l’emploi
 

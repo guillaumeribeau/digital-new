@@ -1489,6 +1489,14 @@ p {
   line-height: 1.8;
   margin-bottom: 0;
 }
+.pricing-details-link {
+  margin-top: 24px;
+  color: #2454ff;
+  font-size: 13px;
+  line-height: 1.7;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
 .year-cost {
   display: flex;
   align-items: center;

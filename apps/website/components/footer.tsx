@@ -49,6 +49,7 @@ export function Footer() {
           © {new Date().getFullYear()} {brand.name}
         </span>
         <nav aria-label="Informations légales">
+          <Link href="/conditions-generales">Conditions de l’offre</Link>
           <Link href="/mentions-legales">Mentions légales</Link>
           <Link href="/politique-confidentialite">Confidentialité</Link>
           <Link href="/cookies">Cookies</Link>

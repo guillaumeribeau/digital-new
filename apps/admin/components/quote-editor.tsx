@@ -1,4 +1,5 @@
 "use client";
+import { business } from "@nova/shared/business";
 import { useActionState, useEffect, useState } from "react";
 import { createQuoteAction } from "../app/commercial-actions";
 type Item = { label: string; description: string; quantity: number; unitPrice: string; taxBasisPoints: number };
@@ -24,7 +25,7 @@ export function QuoteEditor({ leadId, initial, services }: { leadId: string; ini
       <div className="commercial-columns"><div><label htmlFor={`quantity-${index}`}>Quantité {index + 1}</label><input id={`quantity-${index}`} type="number" min={1} max={1000} step={1} value={item.quantity} onChange={(event) => change(index, { quantity: Number(event.target.value) })} required /></div><div><label htmlFor={`price-${index}`}>Prix unitaire HT {index + 1} (€)</label><input id={`price-${index}`} inputMode="decimal" value={item.unitPrice} onChange={(event) => change(index, { unitPrice: event.target.value })} required /></div><div><label htmlFor={`tax-${index}`}>TVA {index + 1} (%)</label><input id={`tax-${index}`} type="number" min={0} max={100} step="0.01" value={item.taxBasisPoints / 100} onChange={(event) => change(index, { taxBasisPoints: Math.round(Number(event.target.value) * 100) })} required /></div></div>
       {items.length > 1 && <button className="text-link" type="button" onClick={() => setItems(items.filter((_, i) => i !== index))}>Retirer cette prestation</button>}
     </fieldset>)}
-    <button className="button secondary" type="button" disabled={items.length >= 30} onClick={() => setItems([...items, { label: "", description: "", quantity: 1, unitPrice: "", taxBasisPoints: 0 }])}>Ajouter une ligne</button>
+    <button className="button secondary" type="button" disabled={items.length >= 30} onClick={() => setItems([...items, { label: "", description: "", quantity: 1, unitPrice: "", taxBasisPoints: business.taxBasisPoints }])}>Ajouter une ligne</button>
     <label htmlFor="deliveryTime">Délai de réalisation</label><input id="deliveryTime" name="deliveryTime" defaultValue={initial.deliveryTime} required minLength={2} maxLength={1000} />
     <label htmlFor="validityDays">Validité du devis (jours)</label><input id="validityDays" name="validityDays" type="number" min={1} max={180} defaultValue={initial.validityDays} required />
     <label htmlFor="quote-terms">Conditions de la prestation et du paiement</label><textarea id="quote-terms" name="terms" defaultValue={initial.terms} minLength={10} maxLength={10000} required />

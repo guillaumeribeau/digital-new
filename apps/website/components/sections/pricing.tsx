@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Check } from "lucide-react";
 import { brand, money } from "@/config/brand.config";
 import { CTA } from "../ui/cta";
@@ -27,12 +28,12 @@ export function Pricing() {
             <p className="price-number">
               <span>{money(brand.pricing.creation)} €</span> HT
             </p>
-            <p>À partir de · Paiement si vous commandez</p>
+            <p>358,80 € TTC · Après acceptation du premier site</p>
             <ul>
               {[
-                "Un site vitrine one-page à votre image",
+                "Un site vitrine de cinq pages à votre image",
                 "Un design adapté au mobile",
-                "Vos services, vos contenus et vos contacts",
+                "Trois séries de retours incluses sous 30 jours",
                 "Les fondamentaux techniques du référencement",
               ].map((v) => (
                 <li key={v}>
@@ -50,13 +51,13 @@ export function Pricing() {
               <span>{money(brand.pricing.monthly)} €</span> HT
               <span className="per-month"> / mois</span>
             </p>
-            <p>Un coût récurrent, annoncé dès le départ</p>
+            <p>34,80 € TTC/mois · Dès la mise en ligne</p>
             <ul>
               {[
                 "Hébergement de votre site",
-                "Nom de domaine standard",
-                "Maintenance technique",
-                "Gestion de la mise en ligne",
+                "Domaine jusqu’à 20 € HT/an",
+                "Une modification de 15 min maximum par mois",
+                "Sans durée minimale d’engagement",
               ].map((v) => (
                 <li key={v}>
                   <Check size={17} />
@@ -65,13 +66,11 @@ export function Pricing() {
               ))}
             </ul>
             <p className="price-conditions">
-              Sous réserve des conditions contractuelles définitives.
-              Engagement, résiliation, support et renouvellement à confirmer
-              avant commande.
+              Abonnement obligatoire à la publication, résiliable à tout moment pour la fin de la période payée. Temps non reportable. Supplément annuel de domaine uniquement avec votre accord. TVA 20 %.
             </p>
           </div>
         </div>
-
+        <p className="pricing-details-link"><Link href="/conditions-generales">Consulter les conditions de l’offre, la résiliation et le transfert →</Link></p>
       </div>
     </section>
   );

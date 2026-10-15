@@ -1,88 +1,35 @@
+import Link from "next/link";
 import { PageIntro } from "@/components/ui/page-intro";
+import { business } from "@nova/shared/business";
 import { pageMetadata } from "@/lib/seo";
-export const metadata = pageMetadata(
-  "Politique de confidentialité",
-  "Comment les informations de votre demande de site sont utilisées. Politique à compléter avec les informations définitives de l’entreprise.",
-  "/politique-confidentialite",
-);
+export const metadata = pageMetadata("Politique de confidentialité", "Utilisation de vos informations par Zelyweb, conservation de vos demandes et exercice de vos droits.", "/politique-confidentialite");
 export default function Privacy() {
-  return (
-    <>
-      <PageIntro
-        label="VOS INFORMATIONS"
-        title="La confidentialité."
-        description="Nous utilisons les informations de votre demande pour comprendre votre projet et vous recontacter. Cette politique doit être finalisée avant l’activation du service."
-      />
-      <article className="container legal-content">
-        <div className="pending-box">
-          <strong>Version préparatoire — à compléter avant publication.</strong>
-          <p>
-            Identité du responsable de traitement, contact pour l’exercice des
-            droits, durées de conservation et prestataires effectifs restent à
-            renseigner. Le service de réception doit être configuré avec la
-            base de données, les e-mails, la protection anti-spam et le
-            processeur des envois avant son ouverture.
-          </p>
-        </div>
-        <h2>Les informations demandées</h2>
-        <p>
-          Nous recueillons les informations sur votre entreprise, votre
-          activité, vos préférences de site et vos coordonnées. Les champs
-          facultatifs sont signalés. Aucun fichier n’est envoyé par ce
-          formulaire.
-        </p>
-        <h2>La finalité du traitement</h2>
-        <p>
-          Nous utilisons ces informations pour examiner votre demande de
-          démonstration, préparer une proposition et échanger avec vous au sujet
-          de ce projet. Le formulaire ne vous inscrit pas à une newsletter.
-        </p>
-        <h2>La base juridique</h2>
-        <p>
-          La base juridique appropriée pour la réponse à une demande
-          précontractuelle et les traitements éventuels doit être confirmée avec
-          le responsable de traitement. Le formulaire recueille votre accord
-          pour être recontacté au sujet de la demande ; il ne recueille aucun
-          consentement publicitaire.
-        </p>
-        <h2>Les destinataires et prestataires</h2>
-        <p>
-          Seules les personnes chargées de votre demande ont vocation à recevoir
-          son contenu. L’intégration prévoit un service transactionnel Resend et
-          une base PostgreSQL sur Railway et une protection anti-spam par Redis.
-          Le formulaire utilise également Cloudflare Turnstile pour vérifier
-          les requêtes et limiter les envois automatisés.
-          Les prestataires effectivement
-          activés, leurs lieux de traitement, les accords de sous-traitance et
-          les garanties applicables doivent être précisés avant l’ouverture du
-          service.
-        </p>
-        <h2>La durée de conservation</h2>
-        <p>
-          La durée de conservation des demandes dans PostgreSQL et les boîtes
-          e-mail est à définir avant activation. Les liens de confirmation sont
-          valables 24 heures. Les contenus des e-mails en attente sont chiffrés
-          et effacés après leur prise en charge ou l’arrêt des tentatives.
-          Le système de
-          limitation de débit prévoit des compteurs temporaires de 15 minutes,
-          associés à un identifiant d’adresse réseau haché. Les demandes ne sont
-          pas enregistrées dans le stockage du navigateur.
-        </p>
-        <h2>Vos droits et votre contact</h2>
-        <p>
-          Les modalités d’accès, de rectification, d’effacement, de limitation
-          et d’opposition, ainsi que le contact du responsable, sont à compléter
-          selon les bases juridiques retenues. Vous pouvez adresser une
-          réclamation à l’autorité de contrôle compétente, notamment la CNIL en
-          France.
-        </p>
-        <h2>Mesure d’audience</h2>
-        <p>
-          Aucun outil Google n’est actif sans identifiant configuré et sans
-          votre accord. Les événements préparés ne contiennent ni nom, ni
-          adresse e-mail, ni téléphone, ni contenu de la demande.
-        </p>
-      </article>
-    </>
-  );
+  return <><PageIntro label="VOS INFORMATIONS" title="La confidentialité." description="Vos informations servent à préparer votre site, échanger avec vous et assurer le suivi de votre demande." />
+    <article className="container legal-content">
+      <p>Mise à jour : 15 octobre 2026.</p>
+      <h2>Responsable du traitement</h2>
+      <p>{business.legalName}, {business.address}. Pour toute question ou demande relative à vos données : <a href={`mailto:${business.email}`}>{business.email}</a>.</p>
+      <h2>Informations collectées</h2>
+      <p>Nous recueillons les coordonnées, les informations professionnelles et les souhaits de site que vous renseignez, puis les échanges liés au projet. Les champs obligatoires sont nécessaires au traitement de votre demande ; les autres sont facultatifs. Aucun fichier n’est transmis par le formulaire initial. Des données techniques de connexion et des identifiants temporaires servent à protéger le formulaire contre les abus.</p>
+      <h2>Utilisation et bases juridiques</h2>
+      <p>L’examen de votre demande, la préparation de la proposition et les échanges préalables reposent sur les mesures précontractuelles prises à votre demande. Le suivi du site et de l’abonnement repose sur l’exécution du contrat. La facturation et les archives imposées par la loi reposent sur nos obligations légales. La prévention de la fraude et des envois automatisés repose sur notre intérêt légitime à sécuriser le service. Les outils de mesure d’audience soumis à consentement restent conditionnés à votre choix. Le formulaire ne vous inscrit pas à une newsletter.</p>
+      <h2>Destinataires et prestataires</h2>
+      <p>Guillaume Ribeau et les seuls intervenants habilités accèdent aux informations nécessaires à votre projet. Railway héberge le site et la base de données ; Resend assure les e-mails transactionnels ; Cloudflare Turnstile protège le formulaire ; Upstash fournit les compteurs temporaires de limitation des abus. Stripe traite les paiements par carte lors des commandes. Zelyweb ne conserve pas le numéro complet de votre carte. Les notifications internes peuvent être reçues dans la boîte Gmail utilisée pour le suivi des demandes.</p>
+      <h2>Traitements internationaux</h2>
+      <p>Certains prestataires peuvent traiter ou rendre accessibles des données hors de l’Espace économique européen, notamment aux États-Unis. Les régions d’hébergement, les accords de traitement et les mécanismes de transfert applicables doivent être vérifiés pour les services utilisés. Vous pouvez demander des précisions à {business.email}. Les engagements de Railway sont accessibles dans son <a href="https://railway.com/legal/dpa">accord de traitement des données</a>.</p>
+      <h2>Durées de conservation</h2>
+      <ul>
+        <li>Demande dont l’adresse e-mail n’a pas été confirmée : 30 jours à compter de la réception.</li>
+        <li>Demande sans suite : 12 mois après le dernier échange.</li>
+        <li>Données nécessaires au service : pendant la relation contractuelle, puis selon les délais de prescription et obligations légales applicables.</li>
+        <li>Copie des fichiers du site destinée à leur récupération : 30 jours après la fin du service.</li>
+        <li>Factures et pièces comptables : 10 ans. Les documents contractuels et les éléments nécessaires à la défense de droits suivent leurs propres délais légaux, en archivage à accès restreint.</li>
+      </ul>
+      <p>Ces échéances font l’objet d’un traitement manuel de suppression ou d’archivage selon la nature des documents. Les liens de confirmation sont valables 24 heures. Les compteurs anti-abus sont temporaires et n’enregistrent pas le contenu de votre demande.</p>
+      <h2>Vos droits</h2>
+      <p>Vous pouvez demander l’accès, la rectification, l’effacement, la limitation ou, selon la base juridique du traitement, l’opposition et la portabilité de vos données. Vous pouvez retirer un consentement à tout moment pour les traitements qui en dépendent. Écrivez à {business.email} ou à notre adresse professionnelle. Nous répondons en principe dans un mois ; une prolongation motivée peut être nécessaire dans les cas prévus par le RGPD. L’effacement reste soumis aux obligations de conservation applicables.</p>
+      <p>Vous pouvez adresser une réclamation à la <a href="https://www.cnil.fr/fr/plaintes">CNIL</a>.</p>
+      <h2>Cookies et audience</h2>
+      <p>Consultez la <Link href="/cookies">page cookies</Link> pour modifier vos préférences. Les outils de mesure d’audience soumis à consentement ne sont activés qu’après accord. Votre demande n’est pas enregistrée dans le stockage de votre navigateur.</p>
+    </article></>;
 }

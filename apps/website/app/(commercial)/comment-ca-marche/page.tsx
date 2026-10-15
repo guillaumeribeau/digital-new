@@ -78,16 +78,12 @@ export default function How() {
       <section className="container domain-note">
         <span className="eyebrow">UNE ADRESSE QUI VOUS APPARTIENT</span>
         <h2>
-          Le domaine à votre nom.
+          Votre domaine, choisi ensemble.
           <br />
           Les démarches avec nous.
         </h2>
         <p>
-          Nous vous aidons à choisir une adresse disponible. Pour l’enregistrer
-          à votre nom, nous vous demanderons les informations administratives
-          nécessaires et votre validation. Nous préparons ensuite les réglages
-          et la mise en ligne. Les modalités de renouvellement et de transfert
-          seront confirmées avant commande.
+          Nous vérifions avec vous la disponibilité, le prix d’achat et le renouvellement avant réservation. Le domaine est géré et payé par Zelyweb jusqu’à 20 € HT/an ; au-delà, votre accord est nécessaire pour un supplément annuel. Le code de transfert est remis gratuitement à votre départ, sous réserve des règles et délais du registre.
         </p>
       </section>
       <FinalCTA />

@@ -1,71 +1,20 @@
 import { brand, firstYearTotal, money } from "@/config/brand.config";
 export const faq = [
-  [
-    "Dois-je payer avant de voir mon site ?",
-    "Non. Nous créons une première proposition et nous vous la présentons gratuitement. Vous ne payez la création que si vous décidez de commander sa mise en ligne.",
-  ],
-  [
-    "Que se passe-t-il si la proposition ne me plaît pas ?",
-    "Nous échangeons sur ce qui vous convient et ce qui doit évoluer. Vous restez libre de ne pas commander. Le nombre de corrections incluses sera précisé dans l’offre définitive avant toute commande.",
-  ],
-  [
-    "Combien coûte le site ?",
-    `La création d’un site vitrine one-page commence à ${money(brand.pricing.creation)} € HT. La gestion technique coûte ${money(brand.pricing.monthly)} € HT par mois. Sur douze mois, cela représente ${money(firstYearTotal)} € HT, création comprise, hors options choisies. Le périmètre et les conditions sont confirmés avant la commande.`,
-  ],
-  [
-    "Pourquoi existe-t-il un abonnement mensuel ?",
-    "Il sert à la gestion technique : hébergement, nom de domaine standard et maintenance. Le périmètre exact du support et les conditions de renouvellement du domaine restent à confirmer dans le contrat définitif.",
-  ],
-  [
-    "Dois-je acheter un nom de domaine ?",
-    "Nous nous occupons des démarches pour un nom de domaine standard. Nous aurons besoin de certaines informations administratives et de votre validation pour l’enregistrer à votre nom. Un domaine premium ou une situation particulière fera l’objet d’une proposition distincte.",
-  ],
-  [
-    "Qui s’occupe de l’hébergement ?",
-    "Nous prenons en charge l’hébergement et la mise en ligne dans le cadre de la gestion technique. Vous n’avez pas à choisir un serveur ou à effectuer des réglages techniques.",
-  ],
-  [
-    "Le site fonctionne-t-il sur téléphone ?",
-    "Oui. Nous prévoyons une présentation adaptée au téléphone, à la tablette et à l’ordinateur. Vos services et vos coordonnées restent faciles à consulter.",
-  ],
-  [
-    "Puis-je demander des modifications ?",
-    "Oui, nous pouvons étudier vos demandes. Le nombre de corrections incluses, les interventions après publication et les éventuelles options seront précisés avant la commande. Nous n’annonçons pas de modifications illimitées.",
-  ],
-  [
-    "Qui est propriétaire de mon nom de domaine ?",
-    "Le domaine a vocation à être enregistré à votre nom avec les informations administratives que vous validez. Les modalités de gestion, de renouvellement et de transfert seront détaillées dans les conditions définitives.",
-  ],
-  [
-    "Que se passe-t-il si je résilie ?",
-    "La durée d’engagement, le préavis, la continuité d’hébergement et les conditions de transfert du site et du domaine sont encore à définir. Nous vous communiquerons ces éléments avant toute commande ; aucune modalité n’est présumée ici.",
-  ],
-  [
-    "Combien de temps faut-il pour recevoir ma proposition ?",
-    "Nous visons une première proposition sous 72 heures après réception des informations nécessaires. Ce délai est un objectif soumis à confirmation, selon la demande et nos disponibilités.",
-  ],
-  [
-    "Mon site sera-t-il visible sur Google ?",
-    "Nous préparons les fondamentaux techniques : structure des titres, métadonnées et affichage mobile. L’indexation et le classement dépendent ensuite des moteurs de recherche et de nombreux facteurs. Nous ne garantissons aucune première position.",
-  ],
+  ["Dois-je payer avant de voir mon site ?", "Non. Nous présentons gratuitement une première version complète de cinq pages sur un aperçu privé. Vous payez la création après acceptation de cette version, puis nous réalisons les ajustements inclus avant publication."],
+  ["Que se passe-t-il si la proposition ne me plaît pas ?", "Vous restez libre de ne pas commander. Si vous acceptez la première version, trois séries de retours regroupés sont incluses après paiement, à transmettre dans les 30 jours. Elles concernent les textes, photos, couleurs et ajustements de présentation."],
+  ["Combien coûte le site ?", `Le site vitrine de cinq pages coûte ${money(brand.pricing.creation)} € HT (358,80 € TTC), puis ${money(brand.pricing.monthly)} € HT (34,80 € TTC) par mois à la publication. L’abonnement est requis à la mise en ligne, sans durée minimale. Pour douze mois d’abonnement et la création, le total est ${money(firstYearTotal)} € HT (776,40 € TTC), hors options et supplément de domaine éventuel. TVA : 20 %.`],
+  ["Que comprend l’abonnement ?", "L’hébergement, un nom de domaine jusqu’à 20 € HT par an et une modification regroupée de 15 minutes maximum par mois. Le temps inutilisé n’est pas reporté. L’abonnement commence à la mise en ligne, après les ajustements, et se résilie à tout moment pour la fin de la période mensuelle payée."],
+  ["Comment choisir mon nom de domaine ?", "Indiquez le nom souhaité ou demandez-nous conseil. Nous vérifions sa disponibilité, son prix d’achat et son renouvellement avant réservation. Zelyweb le gère et le paie ; au-delà de 20 € HT par an, un supplément annuel nécessite votre accord préalable."],
+  ["Qui s’occupe des textes et des photos ?", "Décrivez précisément votre activité et ce que vous voulez faire apparaître. Nous préparons une base complète avec textes et visuels. Vous pouvez aussi fournir vos photos et votre logo, avec les droits nécessaires. Vous validez les contenus avant publication."],
+  ["Le site fonctionne-t-il sur téléphone ?", "Oui. Les cinq pages sont adaptées au téléphone, à la tablette et à l’ordinateur. Accueil, À propos, Services, Réalisations et Contact sont incluses, avec les mentions légales et la confidentialité à partir de vos informations, en complément."],
+  ["Puis-je demander des modifications ?", "Trois séries de retours regroupés sont incluses dans les 30 jours après le paiement de la création. Après publication, une modification de 15 minutes maximum par mois est incluse. Nouvelles pages, fonctionnalités et changements complets de direction font l’objet d’un devis distinct."],
+  ["Puis-je récupérer le domaine et mon site ?", "Oui. Au départ, les fichiers du site et le code de transfert du domaine sont remis gratuitement. Les règles et éventuels délais de blocage du registre restent applicables ; des frais peuvent être facturés par votre nouveau prestataire. La migration effectuée par Zelyweb est facultative : 150 € HT (180 € TTC), après vérification de la compatibilité."],
+  ["Que se passe-t-il si je résilie ?", "Écrivez à contact@zelyweb.com. La résiliation prend effet à la fin de la période mensuelle déjà payée. Demandez vos fichiers et préparez votre nouvel hébergement ; une copie reste disponible pendant 30 jours après la fin du service. La remise est gratuite, la migration technique par Zelyweb est une option payante."],
+  ["Quel est le délai de la première version ?", "Sept jours ouvrés à compter de la réception des informations nécessaires. Vous découvrez un site complet sur un aperçu privé. La publication intervient après acceptation, paiement et ajustements."],
+  ["Mon site sera-t-il visible sur Google ?", "Nous préparons les fondamentaux techniques : structure des titres, métadonnées et affichage mobile. L’indexation et le classement dépendent des moteurs de recherche ; aucune première position n’est garantie."],
 ];
 export const steps = [
-  {
-    title: "Parlez-nous de vous.",
-    text: "Votre activité, vos services, vos envies. Quelques questions simples nous aident à comprendre ce qui vous rend unique.",
-    detail:
-      "Un logo ou des photos ? Nous verrons ensemble les contenus utiles. Vous pouvez commencer même si tout n’est pas encore prêt.",
-  },
-  {
-    title: "Découvrez votre futur site.",
-    text: "Nous transformons vos informations en une première proposition concrète. Vous découvrez le résultat gratuitement, avant de décider.",
-    detail:
-      "Première proposition sous 72 h : un objectif soumis à confirmation et à la réception des informations nécessaires. Nous échangeons avec vous sur la suite.",
-  },
-  {
-    title: "Validez. Nous faisons le reste.",
-    text: "Vous souhaitez aller plus loin ? Après validation de l’offre, nous préparons votre site et sa mise en ligne.",
-    detail:
-      "Domaine, hébergement, réglages techniques : nous nous en occupons. Certaines informations administratives et votre validation seront nécessaires pour enregistrer le domaine à votre nom.",
-  },
+  { title: "Parlez-nous de vous.", text: "Décrivez votre activité, vos services et ce que vous souhaitez faire apparaître sur votre site.", detail: "Nous préparons les textes et les visuels. Vous pouvez aussi fournir vos photos et votre logo avec les droits nécessaires." },
+  { title: "Découvrez votre site complet.", text: "Nous préparons une première version de cinq pages sous sept jours ouvrés après réception des informations nécessaires. Vous la découvrez gratuitement sur un aperçu privé.", detail: "Accueil, À propos, Services, Réalisations et Contact : une base complète que vous pouvez conserver ou ajuster après commande." },
+  { title: "Validez. Ajustons. Publions.", text: "La première version vous plaît ? Réglez la création par carte, puis transmettez jusqu’à trois séries de retours regroupés dans les 30 jours.", detail: "Après les ajustements et votre validation, nous publions le site. L’abonnement commence à cette date : hébergement, domaine et une modification de 15 minutes maximum par mois." },
 ];

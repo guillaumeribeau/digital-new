@@ -1,6 +1,7 @@
 "use client";
 import { useActionState, useEffect, useRef } from "react";
 import { commercialAction } from "../app/commercial-actions";
+import { sellerDefaults } from "@nova/shared/business";
 export function CommercialForm({ children, operation, id, button = "Enregistrer", reset = false, onSuccess }: { children?: React.ReactNode; operation: string; id?: string; button?: string; reset?: boolean; onSuccess?: () => void }) {
   const [state, action, pending] = useActionState(commercialAction, {});
   const form = useRef<HTMLFormElement>(null);
@@ -12,7 +13,14 @@ export function CommercialForm({ children, operation, id, button = "Enregistrer"
       onSuccess?.();
     }
   }, [state, reset, onSuccess]);
-  return <form ref={form} action={action} className="mutation-form"><input type="hidden" name="operation" value={operation} />{id && <input type="hidden" name="id" value={id} />}{children}
+  return <form ref={form} action={action} className="mutation-form"><input type="hidden" name="operation" value={operation} />{id && <input type="hidden" name="id" value={id} />}
+    {operation === "settings" && <><button type="button" className="button secondary" disabled={pending} onClick={() => {
+      for (const key of ["legalName", "address", "registrationNumber", "vatNumber", "taxNote", "terms"] as const) {
+        const input = form.current?.elements.namedItem(key);
+        if (input instanceof HTMLInputElement || input instanceof HTMLTextAreaElement) input.value = sellerDefaults[key];
+      }
+    }}>Reprendre les informations et conditions Zelyweb</button><p className="info-line">Ce bouton préremplit le formulaire. Vérifiez les informations puis cliquez sur Enregistrer pour les conserver.</p></>}
+    {children}
     <button className="button" disabled={pending}>{pending ? "Enregistrement…" : button}</button>
     {state.error && <p role="alert" className="notice error">{state.error}</p>}{state.success && <p role="status" className="notice success">{state.success}</p>}
   </form>;

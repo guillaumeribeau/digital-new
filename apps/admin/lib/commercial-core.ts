@@ -74,7 +74,7 @@ export function calculate(items: z.infer<typeof quoteInput>["items"]) {
 }
 export const snapshotSchema = z.object({
   number: z.string(), title: z.string(), createdAt: z.string(), validUntil: z.string(), deliveryTime: z.string(), terms: z.string(),
-  seller: z.object({ legalName: z.string().min(2), address: z.string().min(5), registrationNumber: z.string().min(2), vatNumber: z.string(), taxNote: z.string() }),
+  seller: z.object({ legalName: z.string().min(2), address: z.string().min(5), registrationNumber: z.string().min(2), vatNumber: z.string(), taxNote: z.string(), email: z.email().optional() }),
   buyer: z.object({ company: z.string(), name: z.string(), email: z.email(), address: z.string(), registrationNumber: z.string().default(""), vatNumber: z.string().default("") }),
   items: z.array(z.object({ label: z.string(), description: z.string(), quantity: z.number().int(), unitCents: z.number().int(), taxBasisPoints: z.number().int(), subtotalCents: z.number().int(), taxCents: z.number().int(), totalCents: z.number().int() })),
   subtotalCents: z.number().int(), taxCents: z.number().int(), totalCents: z.number().int(),

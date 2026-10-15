@@ -9,9 +9,9 @@ import "@/styles/project-journey.css";
 
 const stages = [
   { title: "Vous nous racontez", text: "Votre métier, vos prestations, vos envies. Quelques informations pour démarrer.", label: "Votre demande", note: "Tout commence par votre activité.", Icon: Send },
-  { title: "Votre site prend forme", text: "Nous préparons une première proposition gratuite. Vous voyez concrètement votre futur site.", label: "La proposition gratuite", note: "Une première direction, à découvrir avant de payer.", Icon: Sparkles },
-  { title: "Vous gardez la main", text: "On échange sur la proposition. Elle vous plaît ? Vous commandez après confirmation de l’offre.", label: "Votre décision", note: "Vous décidez de la suite, en toute connaissance.", Icon: MessageSquare },
-  { title: "Bienvenue sur le web", text: "Après validation et règlement, nous préparons la mise en ligne et la gestion technique.", label: "La mise en ligne", note: "Votre activité a maintenant son adresse sur le web.", Icon: Globe },
+  { title: "Votre site prend forme", text: "Votre site complet de cinq pages, gratuitement sur aperçu privé, sous sept jours ouvrés après réception des informations nécessaires.", label: "La proposition gratuite", note: "Une première direction, à découvrir avant de payer.", Icon: Sparkles },
+  { title: "Vous gardez la main", text: "La première version vous plaît ? Vous payez la création, puis nous réalisons trois séries de retours regroupés sous 30 jours.", label: "Votre décision", note: "Vous décidez de la suite, en toute connaissance.", Icon: MessageSquare },
+  { title: "Bienvenue sur le web", text: "Après les ajustements et votre validation, nous publions votre site. L’abonnement commence à la mise en ligne.", label: "La mise en ligne", note: "Votre activité a maintenant son adresse sur le web.", Icon: Globe },
 ];
 
 export function ProjectJourney() {
@@ -88,7 +88,7 @@ export function ProjectJourney() {
         </div>
         <p className="pj-instruction">Explorez les étapes <span aria-hidden="true">↓</span></p>
         <div className="pj-cards" aria-label="Les étapes de votre prise en charge">
-          {stages.map(({ title, text, Icon }, i) => <button type="button" key={title} className="pj-card" aria-pressed={active === i} aria-controls="pj-scene" onClick={() => selectStage(i)}><span className="pj-card-top"><span>0{i + 1}</span><Icon size={21} strokeWidth={1.5} /></span><h3>{title}</h3><p>{text}</p><span className="pj-card-foot">{i === 0 ? "Quelques minutes pour démarrer" : i === 1 ? "0 € pour la première proposition" : i === 2 ? `${brand.pricing.creation} € HT à la commande` : `${brand.pricing.monthly} € HT/mois · gestion technique`}</span></button>)}
+          {stages.map(({ title, text, Icon }, i) => <button type="button" key={title} className="pj-card" aria-pressed={active === i} aria-controls="pj-scene" onClick={() => selectStage(i)}><span className="pj-card-top"><span>0{i + 1}</span><Icon size={21} strokeWidth={1.5} /></span><h3>{title}</h3><p>{text}</p><span className="pj-card-foot">{i === 0 ? "Quelques minutes pour démarrer" : i === 1 ? "0 € pour la première proposition" : i === 2 ? `${brand.pricing.creation} € HT · 358,80 € TTC` : `${brand.pricing.monthly} € HT/mois · 34,80 € TTC`}</span></button>)}
         </div>
         <div className="pj-bottom"><p>La première proposition est gratuite.<br /><strong>La suite se décide avec vous.</strong></p><Link className="button primary" href="/demander-mon-site">Imaginer mon futur site <ArrowUpRight size={18} /></Link></div>
       </div>

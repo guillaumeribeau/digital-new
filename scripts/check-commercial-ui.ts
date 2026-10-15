@@ -7,6 +7,7 @@ import assert from "node:assert/strict";
 import { leadRepository } from "../apps/website/lib/lead-repository";
 import { decryptPayload } from "../apps/website/lib/lead-security";
 import { leadSchema } from "@nova/validation";
+import { business } from "@nova/shared/business";
 
 async function main() {
   const connection = new URL(process.env.DATABASE_URL!);
@@ -25,6 +26,11 @@ async function main() {
     for (const path of ["/clients", "/echanges", "/devis", "/paiements", "/parametres/commercial", "/emails-locaux"]) { await page.goto(base + path); await page.waitForURL("**/connexion"); }
     await page.getByLabel("Adresse e-mail", { exact: true }).fill(user.email); await page.getByLabel("Mot de passe", { exact: true }).fill(password); await page.getByRole("button", { name: "Accéder à mon espace" }).click(); await page.waitForURL(base + "/");
     await page.goto(base + "/parametres/commercial");
+    await page.getByRole("button", { name: "Reprendre les informations et conditions Zelyweb", exact: true }).click();
+    assert.equal(await page.getByLabel("Raison sociale / nom de l’entreprise").inputValue(), business.legalName);
+    assert.equal(await page.getByLabel("Immatriculation (SIRET ou équivalent)").inputValue(), business.siret);
+    assert.equal(await page.getByLabel("N° TVA · facultatif").inputValue(), business.vatNumber);
+    assert.ok((await page.getByLabel("Conditions par défaut des devis").inputValue()).includes("14 jours"));
     await page.getByLabel("Raison sociale / nom de l’entreprise").fill("NOVA Démonstration Fictive");
     await page.getByLabel("Adresse de l’entreprise").fill("10 rue du Test, 75000 Ville fictive");
     await page.getByLabel("Immatriculation (SIRET ou équivalent)").fill("DEMO-FICTIF-000");
@@ -43,6 +49,7 @@ async function main() {
     await page.getByText("Tester une réponse client en local", { exact: true }).click(); await page.getByLabel("Réponse de test", { exact: true }).fill("Réponse fictive : merci, je souhaite recevoir le devis.");
     await page.getByRole("button", { name: "Simuler une réponse client", exact: true }).click(); await page.getByText("Ce client attend votre réponse.", { exact: true }).waitFor();
     await page.getByRole("link", { name: "Nouveau devis complémentaire", exact: true }).click();
+    assert.equal(await page.getByLabel("TVA 1 (%)", { exact: true }).inputValue(), "20");
     await page.getByLabel("Intitulé du devis").fill("Page supplémentaire — contrôle navigateur");
     await page.getByLabel("Adresse de facturation", { exact: true }).fill("20 rue du Client, 75000 Ville fictive");
     await page.getByLabel("Nom de la prestation 1", { exact: true }).fill("Création d’une page complémentaire");

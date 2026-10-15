@@ -3,8 +3,8 @@ import { localEmailMode } from "./local-email";
 import { turnstileConfig } from "./anti-bot";
 
 export const TOKEN_LIFETIME_MS = 24 * 60 * 60 * 1000;
-export const PRICING_VERSION = "299-29-sans-engagement-v1";
-export const PRIVACY_VERSION = "lead-pipeline-v1";
+export const PRICING_VERSION = "5-pages-299-29-v2-2026-10-15";
+export const PRIVACY_VERSION = "retention-manuelle-v2-2026-10-15";
 
 export function tokenHash(token: string) {
   return createHash("sha256").update(token).digest("hex");

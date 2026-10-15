@@ -9,7 +9,7 @@ import { FinalCTA } from "@/components/sections/final-cta";
 import { pageMetadata } from "@/lib/seo";
 export const metadata = pageMetadata(
   "Notre offre — Un site vitrine clé en main",
-  `Un site professionnel one-page, adapté au mobile. Création à partir de ${brand.pricing.creation} € HT, hébergement et gestion à ${brand.pricing.monthly} € HT/mois. Découvrez le périmètre.`,
+  `Un site professionnel de cinq pages, adapté au mobile. Création à ${brand.pricing.creation} € HT, (358,80 € TTC), hébergement et gestion à ${brand.pricing.monthly} € HT/mois (34,80 € TTC). Découvrez le périmètre.`,
   "/notre-offre",
 );
 export default function Offer() {
@@ -26,7 +26,7 @@ export default function Offer() {
         <div className="container offer-onepage-grid">
           <div className="offer-onepage-visual">
             <div className="offer-onepage-visual-label">
-              <span>UNE PAGE. TOUTE VOTRE ACTIVITÉ.</span>
+              <span>CINQ PAGES. VOTRE ACTIVITÉ.</span>
               <span>DESKTOP + MOBILE</span>
             </div>
             <div className="offer-onepage-composition">
@@ -83,12 +83,12 @@ export default function Offer() {
           <div className="offer-onepage-copy">
             <p className="eyebrow">LE BON FORMAT POUR VOTRE ACTIVITÉ</p>
             <h2 id="onepage-title">
-              Une seule page.
+              Cinq pages.
               <br />
               <span>La bonne impression.</span>
             </h2>
             <p className="offer-onepage-lead">
-              Tout ce que vos futurs clients ont besoin de savoir, dans une page
+              Tout ce que vos futurs clients ont besoin de savoir, dans cinq pages
               qu’ils ont envie de parcourir.
             </p>
             <p className="offer-onepage-description">
@@ -138,14 +138,17 @@ export default function Offer() {
             <h3>Ce qui est inclus</h3>
             <ul>
               {[
-                "Une page professionnelle complète",
+                "Cinq pages : Accueil, À propos, Services, Réalisations, Contact",
                 "Un design adapté à votre activité",
                 "Un affichage mobile et tablette",
                 "La présentation de vos services",
                 "Vos coordonnées et moyens de contact",
                 "Un formulaire de contact",
                 "Les fondamentaux techniques du référencement",
-                "La préparation à la mise en ligne",
+                "Textes et visuels préparés à partir de votre activité",
+                "Trois séries de retours sous 30 jours après paiement",
+                "Mentions légales et confidentialité intégrées à partir de vos informations",
+                "Une première version complète sous sept jours ouvrés",
               ].map((v) => (
                 <li key={v}>{v}</li>
               ))}
@@ -183,14 +186,11 @@ export default function Offer() {
           </article>
         </div>
         <div className="pending-box">
-          <span className="eyebrow">À CONFIRMER AVANT COMMANDE</span>
-          <h3>Un cadre clair, avant de nous engager.</h3>
-          <p>
-            Durée d’engagement, résiliation, nombre de corrections, périmètre du
-            support, transfert du site et renouvellement du domaine : ces
-            modalités ne sont pas encore validées. Nous vous les communiquerons
-            dans l’offre et les conditions définitives.
-          </p>
+          <span className="eyebrow">VOTRE COLLABORATION AVEC ZELYWEB</span>
+          <h3>Vous découvrez. Vous validez. Nous ajustons.</h3>
+          <p>La première version complète est gratuite sur aperçu privé. Après acceptation, vous réglez la création, puis nous réalisons jusqu’à trois séries de retours regroupés dans les 30 jours. Les textes, photos, couleurs et ajustements de présentation sont inclus ; les nouvelles fonctionnalités sont chiffrées séparément.</p>
+          <p>L’abonnement commence à la publication. À votre départ, les fichiers et le code de transfert du domaine sont remis gratuitement. La migration technique par Zelyweb est facultative : 150 € HT, soit 180 € TTC.</p>
+          <Link href="/conditions-generales">Lire les conditions de l’offre</Link>
         </div>
       </section>
       <Pricing />
