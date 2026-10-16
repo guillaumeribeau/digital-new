@@ -26,8 +26,8 @@ const h = () => new Headers({ cookie });
 let checkoutCount = 0, subscriptionCount = 0, subStatus = "incomplete", invoiceStatus = "open";
 const customerId = "cus_site_fixture", subId = "sub_site_fixture";
 let checkoutMeta: Record<string, string> = {}, subscriptionMeta: Record<string, string> = {};
-let cancelAtEnd = false, intentStatus = "succeeded";
-const invoice = () => ({ id: "in_site_fixture", object: "invoice", customer: customerId, status: invoiceStatus, amount_paid: invoiceStatus === "paid" ? 3480 : 0, amount_due: 3480, total: 3480, currency: "eur", hosted_invoice_url: "https://invoice.stripe.com/i/fixture", invoice_pdf: "https://pay.stripe.com/invoice/fixture/pdf", billing_reason: "subscription_create", metadata: { siteOrderId: orderId }, parent: { subscription_details: { subscription: subId, metadata: { siteOrderId: orderId } } } });
+let cancelAtEnd = false, intentStatus = "succeeded", invoiceReason = "subscription_create", invoiceId = "in_site_fixture";
+const invoice = () => ({ id: invoiceId, object: "invoice", customer: customerId, status: invoiceStatus, amount_paid: invoiceStatus === "paid" ? 3480 : 0, amount_due: 3480, total: 3480, currency: "eur", hosted_invoice_url: "https://invoice.stripe.com/i/fixture", invoice_pdf: "https://pay.stripe.com/invoice/fixture/pdf", billing_reason: invoiceReason, metadata: { siteOrderId: orderId }, parent: { subscription_details: { subscription: subId, metadata: { siteOrderId: orderId } } } });
 const subscription = () => ({ id: subId, object: "subscription", livemode: false, customer: customerId, status: subStatus, cancel_at_period_end: cancelAtEnd, metadata: subscriptionMeta, latest_invoice: invoice(), items: { data: [{ quantity: 1, price: { unit_amount: 2900, currency: "eur", recurring: { interval: "month", interval_count: 1 } } }] } });
 async function stripeEvent(type: string, object: unknown, eventId = "evt_" + randomUUID()) {
   const payload = JSON.stringify({ id: eventId, object: "event", type, livemode: false, data: { object } });
@@ -104,7 +104,7 @@ test("checkout serveur sans doublon, facture et carte enregistrée seulement sur
     if (path === "/v1/subscriptions" && init?.method === "POST") throw new Error("Admin must never create or charge a subscription directly");
     if (path === "/v1/subscriptions") return Response.json({ data: [], has_more: false });
     if (path === "/v1/subscriptions/" + subId) return Response.json(subscription());
-    if (path === "/v1/invoices/in_site_fixture") return Response.json(invoice());
+    if (path === "/v1/invoices/" + invoiceId) return Response.json(invoice());
     if (path === "/v1/billing_portal/configurations") { assert.equal(fields.get("features[subscription_cancel][mode]"), "at_period_end"); return Response.json({ id: "bpc_fixture" }); }
     if (path === "/v1/billing_portal/sessions") { assert.equal(fields.get("customer"), customerId); return Response.json({ url: "https://billing.stripe.com/p/session/fixture" }); }
     throw new Error("Unexpected fixture endpoint: " + path);
@@ -115,6 +115,8 @@ test("checkout serveur sans doublon, facture et carte enregistrée seulement sur
   // Stripe owns request idempotency; the durable attempt must be shared.
   assert.ok(checkoutCount >= 1); assert.equal(await checkoutSite(orderId, input), urls[0]);
   assert.equal((await db.siteOrder.findUniqueOrThrow({ where: { id: orderId } })).creationPaidAt, null);
+  assert.equal(await db.commercialWebhook.count({ where: { key: "site-owner/" + orderId + "/CREATION_ACCEPTED" } }), 1);
+  assert.equal(await db.commercialWebhook.count({ where: { key: "site-owner/" + orderId + "/CREATION_PAID" } }), 0, "An agreement must never announce a payment");
   intentStatus = "requires_payment_method";
   const failedEventId = "evt_" + randomUUID();
   const failedIntent = { id: "pi_site_fixture", metadata: { siteOrderId: orderId } };
@@ -128,7 +130,7 @@ test("checkout serveur sans doublon, facture et carte enregistrée seulement sur
   const paid = await db.siteOrder.findUniqueOrThrow({ where: { id: orderId } }); assert.ok(paid.creationPaidAt); assert.ok(paid.consentText?.includes("420,00")); assert.equal(paid.paymentMethodId, "pm_site_fixture");
   assert.equal(await db.commercialWebhook.count({ where: { key: "site-notice/" + orderId + "/CREATION_PAID" } }), 1);
   assert.equal(await db.commercialWebhook.count({ where: { key: "site-owner/" + orderId + "/CREATION_PAID" } }), 1);
-  const owner = unseal((await db.commercialEmail.findFirstOrThrow({ where: { kind: "SITE_OWNER_NOTICE" } })).payloadEncrypted!) as { to: string[]; subject: string; html: string };
+  const owner = unseal((await db.commercialEmail.findFirstOrThrow({ where: { kind: "SITE_OWNER_NOTICE", payloadEncrypted: { not: null } } })).payloadEncrypted!) as { to: string[]; subject: string; html: string };
   assert.deepEqual(owner.to, ["contact@zelyweb.com"]); assert.ok(owner.subject.startsWith("[TEST]")); assert.ok(!owner.html.includes(token));
 });
 
@@ -164,6 +166,8 @@ test("premier mois refusé bloque la publication ; régularisation, factures, re
   const pending = await db.siteOrder.findUniqueOrThrow({ where: { id: orderId } });
   assert.ok(pending.subscriptionConsentAt); assert.ok(pending.subscriptionConsentText?.includes("premier mois"));
   assert.equal(pending.firstSubscriptionPaidAt, null);
+  assert.equal(await db.commercialWebhook.count({ where: { key: "site-owner/" + orderId + "/SUBSCRIPTION_ACCEPTED" } }), 1);
+  assert.equal(await db.commercialWebhook.count({ where: { key: "site-owner/" + orderId + "/SUBSCRIPTION_ACTIVE" } }), 0);
   const started = subscriptionCount; await checkoutSiteSubscription(orderId, subscriptionInput); assert.equal(subscriptionCount, started);
   // Subscription webhooks can precede checkout.session.completed.
   assert.equal((await stripeEvent("customer.subscription.created", subscription())).status, 200);
@@ -195,4 +199,26 @@ test("premier mois refusé bloque la publication ; régularisation, factures, re
   assert.equal((await db.siteOrder.findUniqueOrThrow({ where: { id: orderId } })).cancelAtPeriodEnd, true);
   project = await db.project.findUniqueOrThrow({ where: { id: projectId } }); assert.equal(project.stage, "PUBLISHED", "No automatic suspension");
   assert.equal((await db.siteOrder.findUniqueOrThrow({ where: { id: orderId } })).billingAlert, true);
+});
+
+
+test("notifications propriétaire : mensualités confirmées, reprises de webhook et absence de liens clients", async () => {
+  invoiceReason = "subscription_cycle"; invoiceId = "in_site_cycle_fixture";
+  invoiceStatus = "paid"; subStatus = "active"; cancelAtEnd = false;
+  const eventId = "evt_" + randomUUID();
+  assert.equal((await stripeEvent("invoice.paid", invoice(), eventId)).status, 200);
+  assert.equal((await stripeEvent("invoice.paid", invoice(), eventId)).status, 200);
+  assert.equal((await stripeEvent("invoice.paid", invoice())).status, 200);
+  assert.equal((await stripeEvent("invoice.finalized", invoice())).status, 200);
+  assert.equal(await db.commercialWebhook.count({ where: { key: "site-owner/" + orderId + "/SUBSCRIPTION_PAYMENT/" + invoiceId } }), 1);
+  const mails = await db.commercialEmail.findMany({ where: { kind: "SITE_OWNER_NOTICE", payloadEncrypted: { not: null } } });
+  for (const row of mails) {
+    const mail = unseal(row.payloadEncrypted!) as { to: string[]; subject: string; text: string; html: string };
+    assert.deepEqual(mail.to, ["contact@zelyweb.com"]);
+    assert.ok(mail.subject.startsWith("[TEST]"));
+    assert.ok(!mail.text.includes(token)); assert.ok(!mail.html.includes("#token="));
+    assert.ok(mail.text.includes("/projets/"));
+  }
+  const monthly = mails.map(m => unseal(m.payloadEncrypted!) as { subject: string; text: string }).filter(m => m.subject.includes("Facture d’abonnement réglée"));
+  assert.equal(monthly.length, 1); assert.ok(monthly[0].text.includes("34,80"));
 });

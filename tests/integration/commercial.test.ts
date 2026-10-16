@@ -102,9 +102,12 @@ test("révision : ancien lien révoqué, acceptation explicite et paiement local
   assert.equal((await clientPost(req(revisedId, { action: "accept", name: "Camille Contrôle", agreement: true, documentHash: "0".repeat(64) }), context(revisedId))).status, 400);
   const accepted = await Promise.all([clientPost(req(revisedId, { action: "accept", name: "Camille Contrôle", agreement: true, documentHash: quote.documentHash }), context(revisedId)), clientPost(req(revisedId, { action: "accept", name: "Camille Contrôle", agreement: true, documentHash: quote.documentHash }), context(revisedId))]);
   assert.deepEqual(accepted.map((response) => response.status), [200, 200]);
+  assert.equal(await db.commercialWebhook.count({ where: { key: `quote-owner/${revisedId}/ACCEPTED` } }), 1);
+  assert.equal(await db.commercialWebhook.count({ where: { key: `quote-owner/${revisedId}/PAID` } }), 0);
   assert.equal((await clientPost(req(revisedId, { action: "simulate", amount: 1 }), context(revisedId))).status, 200);
   assert.equal((await clientPost(req(revisedId, { action: "simulate" }), context(revisedId))).status, 200);
   assert.equal(await db.paymentAttempt.count({ where: { quoteId: revisedId } }), 1);
+  assert.equal(await db.commercialWebhook.count({ where: { key: `quote-owner/${revisedId}/PAID` } }), 1);
   const paid = await db.quote.findUniqueOrThrow({ where: { id: revisedId } }); assert.equal(paid.paymentMode, "LOCAL"); assert.equal(paid.totalCents, 14400);
   assert.equal((await db.project.findUniqueOrThrow({ where: { id: projectId } })).stage, "ACCEPTED");
   await commercialService.changeQuote(h(), revisedId, "complete"); assert.equal((await db.quote.findUniqueOrThrow({ where: { id: revisedId } })).status, "COMPLETED");
@@ -134,8 +137,23 @@ test("Stripe : montant serveur, session réutilisée, signature, mode et paiemen
   assert.equal((await event("checkout.session.async_payment_succeeded", { ...session, payment_status: "paid" }, eventId)).status, 200);
   assert.equal((await db.quote.findUniqueOrThrow({ where: { id } })).paymentMode, "TEST");
   assert.equal(await db.commercialWebhook.count({ where: { key: "stripe/" + eventId } }), 1);
+  assert.equal(await db.commercialWebhook.count({ where: { key: `quote-owner/${id}/PAID` } }), 1);
+  const ownerEmails = (await db.commercialEmail.findMany({ where: { kind: "SITE_OWNER_NOTICE" } })).map(row => unseal(row.payloadEncrypted!) as { to: string[]; subject: string; text: string; html: string });
+  const paidNotice = ownerEmails.find(mail => mail.subject === "[TEST] Devis complémentaire payé");
+  assert.ok(paidNotice); assert.deepEqual(paidNotice.to, ["contact@zelyweb.com"]); assert.ok(paidNotice.text.includes(`/devis/${id}`));
+  assert.ok(!paidNotice.html.includes("#token="));
   Object.assign(process.env, { STRIPE_SECRET_KEY: "", STRIPE_WEBHOOK_SECRET: "" }); globalThis.fetch = originalFetch;
 });
+test("un retour client sur un devis notifie le propriétaire sans annoncer de paiement", async () => {
+  const id = await commercialService.createQuote(h(), draft()); await commercialService.sendQuote(h(), id);
+  const token = await quoteToken(id);
+  assert.equal((await clientPost(req(id, { action: "decline", reason: "Je souhaite modifier le périmètre <script>interdit</script>." }, token), context(id))).status, 200);
+  assert.equal(await db.commercialWebhook.count({ where: { key: `quote-owner/${id}/DECLINED` } }), 1);
+  assert.equal(await db.commercialWebhook.count({ where: { key: `quote-owner/${id}/PAID` } }), 0);
+  const mails = (await db.commercialEmail.findMany({ where: { kind: "SITE_OWNER_NOTICE" } })).map(row => unseal(row.payloadEncrypted!) as { subject: string; html: string });
+  const notice = mails.find(mail => mail.subject.includes("Retour client sur un devis")); assert.ok(notice); assert.ok(!notice.html.includes("<script>"));
+});
+
 test("Resend : réponses et pièces jointes rattachées, signature et doublons contrôlés", async () => {
   process.env.RESEND_WEBHOOK_SECRET = "whsec_" + randomBytes(32).toString("base64");
   const conversation = await db.conversation.findUniqueOrThrow({ where: { leadId } }), emailId = randomUUID();

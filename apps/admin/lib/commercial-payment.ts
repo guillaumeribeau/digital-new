@@ -1,6 +1,7 @@
 import { getDb } from "@nova/database";
 import Stripe from "stripe";
 import { z } from "zod";
+import { queueQuoteOwnerNotification } from "./owner-notifications";
 import { commercialLocal, CommercialError, paymentMode, publicOrigin, snapshotSchema } from "./commercial-core";
 
 export function stripeClient() {
@@ -17,6 +18,7 @@ export async function acceptQuote(id: string, input: unknown) {
     if (quote.status !== "SENT") throw new CommercialError("IMMUTABLE_QUOTE");
     if (quote.validUntil <= new Date()) throw new CommercialError("EXPIRED_QUOTE");
     await tx.quote.update({ where: { id }, data: { status: "ACCEPTED", acceptedAt: new Date(), acceptedName: data.name, acceptanceHash: quote.documentHash, nextReminderAt: null } });
+    await queueQuoteOwnerNotification(tx, quote, "ACCEPTED", "Devis complémentaire accepté — paiement en attente", "Le client a accepté le devis. Le règlement reste à confirmer avant de démarrer la prestation.");
   });
 }
 export async function declineQuote(id: string, input: unknown) {
@@ -29,6 +31,7 @@ export async function declineQuote(id: string, input: unknown) {
     const conversation = await tx.conversation.findUniqueOrThrow({ where: { leadId: quote.leadId } });
     await tx.clientMessage.create({ data: { conversationId: conversation.id, direction: "INBOUND", subject: `Modification du devis ${quote.number}`, content: data.reason, sender: quote.lead.email, deliveryStatus: "RECEIVED" } });
     await tx.conversation.update({ where: { id: conversation.id }, data: { needsReply: true } });
+    await queueQuoteOwnerNotification(tx, quote, "DECLINED", "Retour client sur un devis complémentaire", `Le client demande une modification ou refuse le devis. Son message :\n\n${data.reason}`);
   });
 }
 export async function checkoutQuote(id: string) {
@@ -73,6 +76,7 @@ export async function simulateQuotePayment(id: string) {
     if (quote.status !== "ACCEPTED") throw new CommercialError("PAYMENT_REQUIRED");
     await tx.paymentAttempt.create({ data: { quoteId: id, mode: "LOCAL", status: "SUCCEEDED", amountCents: quote.totalCents, currency: quote.currency, paidAt: new Date() } });
     await tx.quote.update({ where: { id }, data: { status: "PAID", paidAt: new Date(), paymentMode: "LOCAL" } });
+    await queueQuoteOwnerNotification(tx, quote, "PAID", "Devis complémentaire : paiement simulé", "Le paiement est simulé dans l’environnement local. Aucun débit réel.", "LOCAL");
   });
 }
 export async function applyStripeEvent(event: Stripe.Event) {
@@ -94,8 +98,10 @@ export async function applyStripeEvent(event: Stripe.Event) {
       if (!["ACCEPTED", "PAID", "COMPLETED"].includes(quote.status)) throw new CommercialError("INVALID_ACTION");
       await tx.paymentAttempt.update({ where: { id: attempt.id }, data: { status: "SUCCEEDED", stripeSessionId: session.id, paidAt: new Date() } });
       if (quote.status === "ACCEPTED") await tx.quote.update({ where: { id: quote.id }, data: { status: "PAID", paidAt: new Date(), paymentMode: mode } });
+      await queueQuoteOwnerNotification(tx, quote, "PAID", "Devis complémentaire payé", "Le paiement est confirmé par Stripe. La prestation peut être prise en charge selon les conditions du devis.", mode);
     } else if (["checkout.session.async_payment_failed", "checkout.session.expired"].includes(event.type) && attempt.status !== "SUCCEEDED") {
       await tx.paymentAttempt.update({ where: { id: attempt.id }, data: { status: event.type.endsWith("expired") ? "EXPIRED" : "FAILED" } });
+      if (event.type === "checkout.session.async_payment_failed") await queueQuoteOwnerNotification(tx, quote, "PAYMENT_FAILED/" + attempt.id, "Échec de paiement d’un devis complémentaire", "Le paiement n’a pas abouti. Consultez Stripe et la fiche du devis avant de contacter le client.", mode);
     }
     await tx.commercialWebhook.create({ data: { key, provider: "STRIPE" } });
   });

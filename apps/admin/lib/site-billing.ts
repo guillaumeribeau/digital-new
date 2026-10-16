@@ -6,6 +6,7 @@ import { authenticate } from "./access";
 import { cents, CommercialError, digest, paymentMode, publicOrigin, seal, sender, unseal } from "./commercial-core";
 import { stripeClient } from "./commercial-payment";
 import { billingAgreement, billingMoney, billingNoticeEmail, creationTtc, presentationEmail, subscriptionAgreement, subscriptionInvitationEmail, revisionRequestEmail } from "./site-billing-shared";
+import { queueOwnerNotification } from "./owner-notifications";
 import { business } from "@nova/shared/business";
 
 export const previewInput = z.object({
@@ -77,10 +78,12 @@ export async function checkoutSite(id: string, input: unknown) {
       const sessions = await stripeClient().checkout.sessions.list({ customer: o.stripeCustomerId, limit: 100 });
       if (sessions.data.some(s => s.metadata?.siteOrderId === id && s.payment_status === "paid")) throw new CommercialError("PAYMENT_REQUIRED");
     }
-    return tx.siteOrder.update({ where: { id }, data: {
+    const updated = await tx.siteOrder.update({ where: { id }, data: {
       consentAt: o.consentAt || new Date(), acceptedName: o.acceptedName || data.name, consentText: o.consentText || billingAgreement(o.creationHtCents),
       ...(!reuse ? { checkoutAttempt: randomUUID(), stripeSessionId: null, checkoutUrl: null, checkoutExpiresAt: new Date(Date.now() + 23 * 3600000) } : {}),
     }, include: { project: { include: { lead: true } } } });
+    await queueOwnerNotification(tx, { key: "site-owner/" + id + "/CREATION_ACCEPTED", mode: o.mode, subject: "Commande de création acceptée — paiement en attente", text: `${o.project.lead.businessName} · ${o.project.lead.fullName}\n\nLe client a accepté la commande de ${billingMoney(creationTtc(o.creationHtCents))} TTC et les conditions. Le paiement reste à confirmer par Stripe. Cet accord ne vaut pas confirmation de règlement.`, path: `/projets/${o.projectId}#stripe`, replyTo: o.project.lead.email });
+    return updated;
   }, { timeout: 20000 });
   if (order.checkoutUrl) return order.checkoutUrl;
   const stripe = stripeClient();
@@ -178,7 +181,9 @@ export async function checkoutSiteSubscription(id: string, input: unknown) {
       const sessions = await stripe.checkout.sessions.list({ customer: o.stripeCustomerId!, limit: 100 });
       if (sessions.data.some(s => s.metadata?.siteOrderId === id && s.metadata?.purpose === "SITE_SUBSCRIPTION" && s.status === "complete")) throw new CommercialError("SUBSCRIPTION_ALREADY_STARTED");
     }
-    return tx.siteOrder.update({ where: { id }, data: { subscriptionConsentAt: o.subscriptionConsentAt || new Date(), subscriptionConsentText: o.subscriptionConsentText || subscriptionAgreement(o.monthlyHtCents), ...(!reuse ? { subscriptionAttempt: randomUUID(), subscriptionCheckoutSessionId: null, subscriptionCheckoutUrl: null, subscriptionCheckoutExpiresAt: new Date(Date.now() + 23 * 3600000) } : {}) } });
+    const updated = await tx.siteOrder.update({ where: { id }, data: { subscriptionConsentAt: o.subscriptionConsentAt || new Date(), subscriptionConsentText: o.subscriptionConsentText || subscriptionAgreement(o.monthlyHtCents), ...(!reuse ? { subscriptionAttempt: randomUUID(), subscriptionCheckoutSessionId: null, subscriptionCheckoutUrl: null, subscriptionCheckoutExpiresAt: new Date(Date.now() + 23 * 3600000) } : {}) } });
+    await queueOwnerNotification(tx, { key: "site-owner/" + id + "/SUBSCRIPTION_ACCEPTED", mode: o.mode, subject: "Accord d’abonnement donné — paiement en attente", text: `${o.project.lead.businessName} · ${o.project.lead.fullName}\n\nLe client a accepté les conditions de l’abonnement à ${billingMoney(creationTtc(o.monthlyHtCents))} TTC/mois. Il doit encore terminer l’activation et le paiement sur Stripe. La publication reste bloquée tant que le premier paiement n’est pas confirmé.`, path: `/projets/${o.projectId}#stripe`, replyTo: o.project.lead.email });
+    return updated;
   }, { timeout: 20000 });
   if (order.subscriptionCheckoutUrl) return order.subscriptionCheckoutUrl;
   const stripe = stripeClient();
@@ -198,15 +203,8 @@ export async function checkoutSiteSubscription(id: string, input: unknown) {
 }
 export async function queueOwnerBillingNotice(id: string, kind: string, subject: string, text: string) {
   await getDb().$transaction(async tx => {
-    const key = "site-owner/" + id + "/" + kind;
-    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${key}))`;
-    if (await tx.commercialWebhook.findUnique({ where: { key } })) return;
     const o = await tx.siteOrder.findUniqueOrThrow({ where: { id }, include: { project: { include: { lead: true } } } });
-    const title = `${o.mode === "LIVE" ? "" : "[TEST] "}${subject}`;
-    const content = `${o.project.lead.businessName} · ${o.project.lead.fullName}\n\n${text}`;
-    const url = `${publicOrigin()}/projets/${o.projectId}#stripe`;
-    await tx.commercialEmail.create({ data: { kind: "SITE_OWNER_NOTICE", expiresAt: new Date(Date.now() + 23 * 3600000), payloadEncrypted: seal({ from: sender(), to: [business.email], reply_to: o.project.lead.email, subject: title, text: `${content}\n\nOuvrir la fiche : ${url}`, html: billingNoticeEmail("Guillaume", title, content, url, "Ouvrir le projet dans l’admin") }) } });
-    await tx.commercialWebhook.create({ data: { key, provider: "STRIPE" } });
+    await queueOwnerNotification(tx, { key: "site-owner/" + id + "/" + kind, mode: o.mode, subject, text: `${o.project.lead.businessName} · ${o.project.lead.fullName}\n\n${text}`, path: `/projets/${o.projectId}#stripe`, replyTo: o.project.lead.email });
   });
 }
 export async function queueSiteNotice(id: string, kind: string, subject: string, text: string) {
