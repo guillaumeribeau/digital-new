@@ -31,9 +31,11 @@ export function HomeContent() {
               faites, ce qui vous distingue et comment vous contacter.
             </p>
             <p className="nh-body">
-              Votre site rassemble l’essentiel de votre activité dans cinq pages
-              claires, soignée et facile à consulter. Vous nous parlez de votre
-              métier. Nous lui donnons une présence en ligne.
+              Artisans, commerçants, professions libérales, indépendants ou
+              entreprises : votre site vitrine rassemble l’essentiel de votre
+              activité dans cinq pages claires, soignées et faciles à consulter.
+              Nous vous accompagnons à distance, partout en France, avec un
+              interlocuteur direct pour vos textes, vos visuels et la mise en ligne.
             </p>
             <Link className="nh-inline-link" href="/notre-offre">
               Découvrir ce qui est inclus <ArrowUpRight size={19} />
@@ -152,9 +154,9 @@ export function HomeContent() {
             <div>
               <p className="nh-kicker">04 / PAS UN STYLE. LE VÔTRE.</p>
               <h2>
-                Trois métiers.
+                Des métiers différents.
                 <br />
-                <span>Trois façons de se montrer.</span>
+                <span>Des univers qui vous ressemblent.</span>
               </h2>
             </div>
             <p>
@@ -166,14 +168,14 @@ export function HomeContent() {
           <Gallery compact />
           <div className="nh-gallery-end">
             <p>
-              Six univers à découvrir.
+              Neuf univers à découvrir.
               <br />
               <span>
                 Des exemples fictifs, construits comme de vrais sites.
               </span>
             </p>
             <Link className="button dark" href="/exemples">
-              Explorer les 6 exemples <ArrowUpRight size={19} />
+              Explorer les 9 exemples <ArrowUpRight size={19} />
             </Link>
           </div>
         </div>

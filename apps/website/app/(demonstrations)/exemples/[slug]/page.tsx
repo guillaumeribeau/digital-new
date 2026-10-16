@@ -7,6 +7,7 @@ import { SalonSite } from "@/components/examples/salon-site";
 import { ConsultingSite } from "@/components/examples/consulting-site";
 import { WellnessSite } from "@/components/examples/wellness-site";
 import { CommunitySite } from "@/components/examples/community-site";
+import { RestaurantSite, PhotographerSite, AutomotiveSite } from "@/components/examples/dark-sites";
 export const dynamicParams = false;
 export function generateStaticParams() {
   return examples.map((e) => ({ slug: e.slug }));
@@ -55,6 +56,12 @@ export default async function DemoPage({
       return <WellnessSite />;
     case "association":
       return <CommunitySite />;
+    case "restaurant":
+      return <RestaurantSite />;
+    case "photographe":
+      return <PhotographerSite />;
+    case "automobile":
+      return <AutomotiveSite />;
     default:
       notFound();
   }

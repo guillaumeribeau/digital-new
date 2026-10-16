@@ -7,6 +7,7 @@ const browser = await chromium.launch({
     "C:/Program Files/Google/Chrome/Application/chrome.exe",
   headless: true,
 });
+const base = process.env.EXAMPLES_BASE_URL || "http://127.0.0.1:3000";
 const errors = [];
 const results = [];
 for (const width of [375, 768, 1024, 1440]) {
@@ -15,12 +16,13 @@ for (const width of [375, 768, 1024, 1440]) {
     reducedMotion: "reduce",
   });
   page.on("pageerror", (e) => errors.push(e.message));
-  const response = await page.goto("http://127.0.0.1:3000/exemples", {
+  await page.route("**/client.crisp.chat/**", route => route.fulfill({ contentType: "application/javascript", body: "" }));
+  const response = await page.goto(base + "/exemples", {
     waitUntil: "networkidle",
   });
   assert.equal(response.status(), 200);
   await page.addStyleTag({ content: "nextjs-portal{display:none!important}" });
-  assert.equal(await page.locator(".portfolio-project").count(), 6);
+  assert.equal(await page.locator(".portfolio-project").count(), 9);
   await page.evaluate(async () => {
     for (let y = 0; y < document.documentElement.scrollHeight; y += 800) {
       window.scrollTo(0, y);
@@ -47,12 +49,12 @@ for (const width of [375, 768, 1024, 1440]) {
     path: "reports/examples/gallery-top-" + width + ".png",
   });
   for (const [name, count] of [
-    ["Artisanat", 2],
-    ["Commerce", 1],
-    ["Indépendants", 1],
+    ["Artisanat", 3],
+    ["Commerce", 2],
+    ["Indépendants", 2],
     ["Professions libérales", 1],
     ["Associations", 1],
-    ["Tous", 6],
+    ["Tous", 9],
   ]) {
     await page.getByRole("button", { name, exact: true }).click();
     assert.equal(await page.locator(".portfolio-project").count(), count);

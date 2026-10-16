@@ -7,6 +7,9 @@ import {
   Compass,
   Sun,
   HeartHandshake,
+  UtensilsCrossed,
+  Aperture,
+  Sparkles,
 } from "lucide-react";
 import { DemoMenu } from "./demo-menu";
 import { DemoForm } from "./demo-form";
@@ -18,6 +21,9 @@ const icons = {
   conseil: Compass,
   "bien-etre": Sun,
   association: HeartHandshake,
+  restaurant: UtensilsCrossed,
+  photographe: Aperture,
+  automobile: Sparkles,
 };
 export function DemoLogo({ slug }: { slug: ExampleSlug }) {
   const e = examples.find((e) => e.slug === slug)!;
@@ -50,10 +56,12 @@ export function DemoLogo({ slug }: { slug: ExampleSlug }) {
           <>
             Équilibre <i>&</i> Sens<small>ACCOMPAGNEMENT & BIEN-ÊTRE</small>
           </>
-        ) : (
+        ) : slug === "association" ? (
           <>
             ensemble<small>& DEMAIN</small>
           </>
+        ) : (
+          <>{e.shortName}<small>{e.sector}</small></>
         )}
       </span>
     </a>
@@ -145,7 +153,10 @@ export function DemoContact({
                       ? "horizon-conseil"
                       : slug === "bien-etre"
                         ? "equilibre-sens"
-                        : "ensemble-demain"}
+                        : slug === "restaurant" ? "atelier-braises"
+                          : slug === "photographe" ? "noe-laurent"
+                            : slug === "automobile" ? "atelier-minuit"
+                              : "ensemble-demain"}
               .example
               <br />
               00 00 00 00 00 · numéro non actif

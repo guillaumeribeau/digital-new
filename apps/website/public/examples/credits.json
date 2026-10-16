@@ -214,5 +214,113 @@
     "file": "/examples/association/about.jpg",
     "dimensions": "1200x857",
     "sha256": "99C8A51824025866D19B6497B6D6E84DE39E21BC270E6F22662FE944EC5BDF34"
+  },
+  {
+    "site": "restaurant",
+    "usage": "hero",
+    "description": "Salle de restaurant aux lumières tamisées",
+    "author": "miniperde",
+    "page": "https://www.pexels.com/photo/dark-modern-interior-of-a-restaurant-15626998/",
+    "license": "https://www.pexels.com/license/",
+    "sourceUrl": "https://images.pexels.com/photos/15626998/pexels-photo-15626998.jpeg?auto=compress&cs=tinysrgb&w=1600&q=85",
+    "file": "/examples/restaurant/hero.jpg",
+    "dimensions": "1600x2400",
+    "sha256": "F7E95E8B1108706486D61A613B78452775B8C6F54529E4253808151D1BAFE781"
+  },
+  {
+    "site": "restaurant",
+    "usage": "detail",
+    "description": "Assiette gastronomique sur fond sombre",
+    "author": "Valeria Boltneva",
+    "page": "https://www.pexels.com/photo/appetizing-plated-gourmet-meal-presentation-30335685/",
+    "license": "https://www.pexels.com/license/",
+    "sourceUrl": "https://images.pexels.com/photos/30335685/pexels-photo-30335685.jpeg?auto=compress&cs=tinysrgb&w=1600&q=85",
+    "file": "/examples/restaurant/detail.jpg",
+    "dimensions": "1600x2399",
+    "sha256": "4197F5DFB729224F16D05C9BBFE4395B9637A27C6D30B8EB8F8553648A1D46DE"
+  },
+  {
+    "site": "restaurant",
+    "usage": "about",
+    "description": "Intérieur intimiste d’un restaurant",
+    "author": "miniperde",
+    "page": "https://www.pexels.com/photo/dark-modern-interior-of-a-restaurant-15627000/",
+    "license": "https://www.pexels.com/license/",
+    "sourceUrl": "https://images.pexels.com/photos/15627000/pexels-photo-15627000.jpeg?auto=compress&cs=tinysrgb&w=1600&q=85",
+    "file": "/examples/restaurant/about.jpg",
+    "dimensions": "1600x2400",
+    "sha256": "D39B8E3B04C8792F1DF82A31E4F5BE4014DF3E0AEB49C41FF9502D91A42FC8D8"
+  },
+  {
+    "site": "photographe",
+    "usage": "hero",
+    "description": "Architecture géométrique en noir et blanc",
+    "author": "Juan Pablo Daniel",
+    "page": "https://www.pexels.com/photo/modern-geometric-black-and-white-building-facade-36197789/",
+    "license": "https://www.pexels.com/license/",
+    "sourceUrl": "https://images.pexels.com/photos/36197789/pexels-photo-36197789.jpeg?auto=compress&cs=tinysrgb&w=1600&q=85",
+    "file": "/examples/photographe/hero.jpg",
+    "dimensions": "1600x1067",
+    "sha256": "A943FAFB39558695C811C9057718F3204F7734DD6CBB7B70F71447AC898C8FD9"
+  },
+  {
+    "site": "photographe",
+    "usage": "detail",
+    "description": "Façades, lignes et ombres en noir et blanc",
+    "author": "Chris F",
+    "page": "https://www.pexels.com/photo/facade-of-buildings-in-black-and-white-14307406/",
+    "license": "https://www.pexels.com/license/",
+    "sourceUrl": "https://images.pexels.com/photos/14307406/pexels-photo-14307406.jpeg?auto=compress&cs=tinysrgb&w=1600&q=85",
+    "file": "/examples/photographe/detail.jpg",
+    "dimensions": "1600x1021",
+    "sha256": "2300DD366796B9006EB34601B5178E1C8E0D7138AC2A58A124D009DCA9E9AA6D"
+  },
+  {
+    "site": "photographe",
+    "usage": "about",
+    "description": "Façade moderne et motifs géométriques",
+    "author": "Marcelo Rodrigo",
+    "page": "https://www.pexels.com/photo/modern-architecture-black-and-white-facade-35534777/",
+    "license": "https://www.pexels.com/license/",
+    "sourceUrl": "https://images.pexels.com/photos/35534777/pexels-photo-35534777.jpeg?auto=compress&cs=tinysrgb&w=1600&q=85",
+    "file": "/examples/photographe/about.jpg",
+    "dimensions": "1600x1200",
+    "sha256": "4237C18A539635C47423E2C9CFBBBF9FDA938E48573EB762071A18FCA3D72286"
+  },
+  {
+    "site": "automobile",
+    "usage": "hero",
+    "description": "Coupé noir devant un atelier",
+    "author": "Jae Park",
+    "page": "https://www.pexels.com/photo/black-matte-car-parked-in-front-of-garage-door-6969022/",
+    "license": "https://www.pexels.com/license/",
+    "sourceUrl": "https://images.pexels.com/photos/6969022/pexels-photo-6969022.jpeg?auto=compress&cs=tinysrgb&w=1600&q=85",
+    "file": "/examples/automobile/hero.jpg",
+    "dimensions": "1600x900",
+    "sha256": "CCA217EC870B60F1983C2A9791026B5EB9DC348DA79F8FEE14BDF1901349A8A4"
+  },
+  {
+    "site": "automobile",
+    "usage": "detail",
+    "description": "Polissage d’une carrosserie",
+    "author": "Melih Can",
+    "page": "https://www.pexels.com/photo/car-polishing-process-in-a-workshop-35149474/",
+    "license": "https://www.pexels.com/license/",
+    "sourceUrl": "https://images.pexels.com/photos/35149474/pexels-photo-35149474.jpeg?auto=compress&cs=tinysrgb&w=1600&q=85",
+    "file": "/examples/automobile/detail.jpg",
+    "dimensions": "1600x2400",
+    "sha256": "18D47BFEBF5147B759168BDC5F0B3E61D73FBB66766BD63B6F801B57FB35E30B"
+  },
+  {
+    "site": "automobile",
+    "usage": "about",
+    "description": "Détail d’un véhicule noir dans un garage",
+    "author": "Matheus Bertelli",
+    "page": "https://www.pexels.com/photo/black-shiny-car-in-a-garage-10182852/",
+    "license": "https://www.pexels.com/license/",
+    "sourceUrl": "https://images.pexels.com/photos/10182852/pexels-photo-10182852.jpeg?auto=compress&cs=tinysrgb&w=1600&q=85",
+    "file": "/examples/automobile/about.jpg",
+    "dimensions": "1600x2400",
+    "sha256": "58FCB8B378F46459C9B1225C04487F8B5ED1677DA533DECAFCABC3143DFF13AF"
   }
 ]

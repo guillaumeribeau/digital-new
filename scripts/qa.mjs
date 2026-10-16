@@ -74,9 +74,9 @@ const page = await browser.newPage({
 });
 page.on("pageerror", (e) => errors.push(e.message));
 await page.goto("http://127.0.0.1:3000/exemples");
-assert.equal(await page.locator(".demo-card").count(), 6);
+assert.equal(await page.locator(".demo-card").count(), 9);
 await page.getByRole("button", { name: "Artisanat", exact: true }).click();
-assert.equal(await page.locator(".demo-card").count(), 2);
+assert.equal(await page.locator(".demo-card").count(), 3);
 await page.getByRole("button", { name: "Associations", exact: true }).click();
 assert.equal(await page.locator(".demo-card").count(), 1);
 await page.goto("http://127.0.0.1:3000/faq");

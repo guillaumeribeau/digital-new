@@ -81,7 +81,7 @@ export function Gallery({ compact = false }: { compact?: boolean }) {
     } catch {}
     return () => lifecycle.abort();
   }, [compact]);
-  const selected = (compact ? examples.slice(0, 3) : examples).filter(
+  const selected = (compact ? examples.filter((_, index) => index < 3 || index >= 6) : examples).filter(
     (d) => filter === "Tous" || d.category === filter,
   );
   return (

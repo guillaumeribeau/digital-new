@@ -63,7 +63,7 @@ Les pages métiers envisagées ne sont pas publiées. Ajouter une route seulemen
 | LEAD_TO_EMAIL                    | Boîte qui recevra les demandes internes                                                                                       |
 | UPSTASH_REDIS_REST_URL / TOKEN   | Redis REST partagé pour la protection anti-spam de production                                                                 |
 | RATE_LIMIT_SALT                  | Secret aléatoire serveur pour hacher les adresses réseau                                                                      |
-| NEXT_PUBLIC_GTM_ID               | Facultatif ; laisser vide tant que les outils, finalités et consentements ne sont pas validés                                 |
+| NEXT_PUBLIC_GA_ID                | Propriété Analytics publique ; `G-TDLF1WPKD4` par défaut, chargée uniquement après consentement                              |
 
 Les champs contractuels restent null tant qu’ils ne sont pas validés. Après leur validation, remplacer également les formulations préparatoires des pages offre, FAQ et légales pour présenter les conditions réelles. Aucune clause n’est créée automatiquement à partir de ces champs.
 
@@ -73,7 +73,7 @@ Sans domaine configuré, le site reste noindex et le sitemap ne contient aucune 
 
 Le formulaire utilise React Hook Form et Zod, avec validation par étape et côté serveur. Aucune donnée personnelle ne passe dans l’URL, les événements analytics ou le stockage local. Les saisies restent en mémoire pendant la navigation entre étapes ; un rechargement les efface. L’ajout de fichiers est désactivé faute de stockage sécurisé configuré.
 
-Le parcours comporte trois étapes : activité et principales prestations, choix d’une des six démonstrations ou « Proposez-moi un style » (par défaut), puis coordonnées et récapitulatif modifiable. Le téléphone est facultatif pour un contact par email et requis pour un contact téléphonique, avec la même validation côté serveur. Les couleurs, le logo et les photos sont reportés aux échanges après la demande. Aucun espace de dépôt ou service d’envoi n’est activé par cette simplification.
+Le parcours comporte trois étapes : activité et principales prestations, choix d’une des neuf démonstrations ou « Proposez-moi un style » (par défaut), puis coordonnées et récapitulatif modifiable. Le téléphone est facultatif pour un contact par email et requis pour un contact téléphonique, avec la même validation côté serveur. Les couleurs, le logo et les photos sont reportés aux échanges après la demande. Aucun espace de dépôt ou service d’envoi n’est activé par cette simplification.
 
 Le contrôle node scripts/check-lead-form.mjs vérifie les quatre largeurs, les choix visuels, la validation conditionnelle, les modifications du récapitulatif et les réponses d’envoi simulées, sans transmettre d’email réel.
 
@@ -87,7 +87,11 @@ Sans configuration PostgreSQL, Resend, origine et clé d’outbox (ainsi que Red
 
 Les événements préparés sont cta_click, lead_form_start, lead_form_step, lead_form_submit, lead_form_success et contact_click. Ils n’acceptent que des emplacements prédéfinis et un numéro d’étape. lead_form_success intervient uniquement après la réponse serveur confirmée. Les liens de contact apparaissent après configuration des coordonnées.
 
-Sans identifiant GTM, aucun script Google n’est chargé. Avec un identifiant valide, le conteneur est chargé seulement après acceptation. Accepter et refuser sont deux actions au même niveau ; un contrôle de préférences est disponible en pied de page. Le refus après acceptation recharge la page pour interrompre les scripts. Le conteneur est à configurer pour respecter le consentement et empêcher toute donnée personnelle de sortir. Ajouter une gestion séparée du consentement publicitaire et finaliser le registre des traceurs avant activation de Google Ads. Les traceurs déjà déposés et leurs durées doivent être gérés dans cette configuration finale ; la préparation actuelle ne constitue pas un audit juridique.
+Google Analytics 4 utilise directement la propriété Zelyweb `G-TDLF1WPKD4` (remplaçable par `NEXT_PUBLIC_GA_ID`). Aucun conteneur GTM n’est chargé en parallèle. Le SDK et les événements sont chargés seulement après acceptation. Accepter et refuser sont deux actions au même niveau ; les préférences restent accessibles en pied de page. Le refus après acceptation désactive la collecte et recharge la page. Le suivi publicitaire reste refusé et Google signals désactivé. Les cookies Analytics expirent après un an, sans renouvellement automatique.
+
+**Réglage du flux requis avant publication : désactiver Mesure optimisée dans Analytics → Administration → Flux de données → flux Web.** Le site envoie lui-même une seule vue par navigation et les événements du formulaire ; la mesure automatique pourrait provoquer des doublons et transmettre des interactions non filtrées. Les URL transmises excluent les fragments et les paramètres arbitraires ; seuls les UTM de campagne au format restreint sont conservés. Ne jamais mettre de coordonnées dans les noms de campagnes. Les pages de confirmation, les e-mails locaux et les démonstrations sont exclus. `lead_form_success` signifie demande enregistrée, pas e-mail confirmé ni vente. La liaison Google Ads et les pixels des autres régies ne sont pas activés par cette intégration.
+
+Contrôle navigateur sans envoi réel : démarrer le site sur le port 3100, puis `node scripts/check-analytics.mjs` (`QA_BASE_URL` facultatif). Après publication, vérifier un parcours consenti dans Temps réel/DebugView. Utiliser Acquisition de trafic pour comparer source/support/campagne et marquer `lead_form_success` comme événement clé si souhaité. Le choix de conservation des événements dans la propriété Google reste à régler par l’opérateur.
 
 ## Déploiement Railway
 
@@ -96,6 +100,16 @@ Utiliser les services indépendants et commandes décrits dans [railway-monorepo
 Aucun déploiement public n’a été effectué. L’envoi réel, la livraison des e-mails, la configuration Redis et les outils Google n’ont pas été testés avec des comptes de production.
 
 ## Sources techniques
+
+### SEO et aperçus Zelyweb
+
+Les métadonnées commerciales utilisent le visuel `/brand/zelyweb-partage.png` (1200 × 630), la favicon PNG de 96 px, sa version SVG et une icône Apple de 180 px. Le visuel conserve le logo fourni et présente un exemple explicitement fictif. `node scripts/generate-brand-assets.mjs` régénère ces fichiers avec Chrome installé (`CHROME_PATH` facultatif). Les grandes images d’aperçu sont autorisées pour Google ; leur affichage dans les résultats reste choisi par le moteur.
+
+Pour Search Console, créer une propriété **Domaine** `zelyweb.com` dans https://search.google.com/search-console, puis ajouter l’enregistrement TXT fourni par Google dans la zone DNS du domaine. Conserver cet enregistrement après validation. Soumettre ensuite `https://zelyweb.com/sitemap.xml` et inspecter l’accueil et l’offre pour demander une indexation après publication. Cette procédure ne nécessite ni balise HTML ni variable Railway.
+
+Alternative : pour une propriété **Préfixe de l’URL** `https://zelyweb.com/`, choisir la vérification par balise HTML et renseigner `GOOGLE_SITE_VERIFICATION` dans le service Railway du site avec uniquement la valeur `content` fournie par Google, puis reconstruire et déployer avant de valider. Cette variable est facultative et ne remplace pas le TXT d’une propriété Domaine. Aucune validation de propriété n’est effectuée automatiquement par le projet.
+
+Référence : [validation de propriété Search Console](https://support.google.com/webmasters/answer/9008080?hl=fr).
 
 - [Documentation Next.js](https://nextjs.org/docs/app/getting-started/installation)
 - [Resend : envois groupés et idempotence](https://resend.com/changelog/batch-idempotency-keys)
@@ -109,13 +123,13 @@ La référence commerciale fournie n’a pas pu être consultée par l’outil d
 
 La galerie propose filter_site_demonstrations si le navigateur fournit document.modelContext. Cet outil valide un secteur et utilise le même filtre que l’interface, sans accéder aux coordonnées ni transmettre une demande. Il est nettoyé au démontage. Aucun contexte WebMCP compatible n’était disponible pour la vérification réelle ; les contrôles de l’interface et la compilation restent indépendants de cette API facultative.
 
-## Les six démonstrations complètes
+## Les neuf démonstrations complètes
 
-Les routes /exemples/plombier, /exemples/paysagiste, /exemples/coiffure, /exemples/conseil, /exemples/bien-etre et /exemples/association sont des sites React one-page complets. Chaque composition dispose de son identité graphique, de sa navigation par ancres, de ses prestations, de sa présentation, de son contact et de son pied de page. Les formulaires de démonstration ne font aucune requête et ne conservent aucune donnée ; leurs coordonnées en .example et leur numéro à zéro sont explicitement fictifs. Le bandeau de retour à la galerie identifie toujours les exemples.
+Les routes /exemples/plombier, /exemples/paysagiste, /exemples/coiffure, /exemples/conseil, /exemples/bien-etre, /exemples/association, /exemples/restaurant, /exemples/photographe et /exemples/automobile sont des sites React one-page complets. Chaque composition dispose de son identité graphique, de sa navigation par ancres, de ses prestations, de sa présentation, de son contact et de son pied de page. Les formulaires de démonstration ne font aucune requête et ne conservent aucune donnée ; leurs coordonnées en .example et leur numéro à zéro sont explicitement fictifs. Le bandeau de retour à la galerie identifie toujours les exemples.
 
 Les groupes de routes app/(commercial) et app/(demonstrations) séparent les layouts sans changer les URL commerciales existantes. Le header, le footer et les outils de consentement de la marque ne sont pas affichés dans les démonstrations. Les démonstrations sont pré-générées et noindex ; elles ne sont pas ajoutées au sitemap commercial.
 
-18 photographies Pexels sont stockées dans public/examples/, trois par métier. Le fichier public/examples/credits.json conserve les pages sources, les auteurs, la licence, les dimensions et les empreintes SHA256. Les crédits sont aussi consultables dans chaque pied de page. Les photographies sont illustratives : aucune personne représentée n’est présentée comme membre d’une entreprise fictive ou comme cliente réelle.
+27 photographies Pexels sont stockées dans public/examples/, trois par métier. Le fichier public/examples/credits.json conserve les pages sources, les auteurs, la licence, les dimensions et les empreintes SHA256. Les crédits sont aussi consultables dans chaque pied de page. Les photographies sont illustratives : aucune personne représentée n’est présentée comme membre d’une entreprise fictive ou comme cliente réelle.
 
 La galerie affiche les captures des véritables pages, au format desktop et mobile. Pour les régénérer après une modification, démarrer l’application sur http://127.0.0.1:3000 puis lancer :
 
@@ -124,4 +138,4 @@ npm run examples:capture
 npm run examples:check
 ```
 
-La première commande vérifie les six pages à quatre largeurs, le chargement des photographies, les navigations mobiles et l’absence de transmission des formulaires. Elle produit les douze fichiers WebP utilisés dans public/examples/previews/ et les captures intégrales dans reports/examples/. Le bandeau d’information est retiré uniquement des captures destinées à la galerie ; les pages consultables le conservent. La seconde commande contrôle la galerie, ses six filtres, les allers-retours vers les sites et le chargement de tous les aperçus. Les scripts utilisent Chrome installé ; CHROME_PATH permet de choisir un autre exécutable. EXAMPLES_BASE_URL permet de changer l’origine utilisée par le script de capture.
+La première commande vérifie les neuf pages à quatre largeurs, le chargement des photographies, les navigations mobiles et l’absence de transmission des formulaires. Elle produit les dix-huit fichiers WebP utilisés dans public/examples/previews/ et les captures intégrales dans reports/examples/. Le bandeau d’information est retiré uniquement des captures destinées à la galerie ; les pages consultables le conservent. La seconde commande contrôle la galerie, ses six filtres, les allers-retours vers les sites et le chargement de tous les aperçus. Les scripts utilisent Chrome installé ; CHROME_PATH permet de choisir un autre exécutable. EXAMPLES_BASE_URL permet de changer l’origine utilisée par les scripts de capture et de contrôle de galerie.

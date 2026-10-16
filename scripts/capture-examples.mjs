@@ -3,14 +3,20 @@ import sharp from "sharp";
 import { mkdir, writeFile } from "node:fs/promises";
 import assert from "node:assert/strict";
 const base = process.env.EXAMPLES_BASE_URL || "http://127.0.0.1:3000";
-const slugs = [
+const allSlugs = [
   "plombier",
   "paysagiste",
   "coiffure",
   "conseil",
   "bien-etre",
   "association",
+  "restaurant",
+  "photographe",
+  "automobile",
 ];
+const requested = process.argv.slice(2);
+const slugs = requested.length ? allSlugs.filter(slug => requested.includes(slug)) : allSlugs;
+assert.ok(slugs.length > 0, "Choisir au moins un exemple connu");
 await mkdir("apps/website/public/examples/previews", { recursive: true });
 await mkdir("reports/examples", { recursive: true });
 const browser = await chromium.launch({
@@ -144,5 +150,5 @@ await writeFile(
 );
 await browser.close();
 console.log(
-  "6 sites, 24 contrôles responsive, 12 aperçus et contacts fictifs : OK.",
+  `${slugs.length} sites, ${slugs.length * 4} contrôles responsive, ${slugs.length * 2} aperçus et contacts fictifs : OK.`,
 );

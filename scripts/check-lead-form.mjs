@@ -17,6 +17,13 @@ for (const width of [375, 768, 1024, 1440]) {
     reducedMotion: "reduce",
   });
   page.on("pageerror", (e) => errors.push(e.message));
+  const [style, exampleName] = ({
+    375: ["restaurant", "L’Atelier des Braises"],
+    768: ["photographe", "Noé Laurent Studio"],
+    1024: ["automobile", "Atelier Minuit"],
+    1440: ["coiffure", "Maison Camille"],
+  })[width];
+  await page.route("**/client.crisp.chat/**", route => route.fulfill({contentType:"application/javascript",body:""}));
   let posts = 0,
     lastPayload,
     success = false;
@@ -50,6 +57,9 @@ for (const width of [375, 768, 1024, 1440]) {
   await page
     .getByLabel("Votre métier et vos principales prestations")
     .fill("Plombier : rénovation et dépannage");
+  // Let on-blur validation settle before scrolling to the mobile submit button.
+  await page.getByLabel("Votre métier et vos principales prestations").blur();
+  await page.waitForFunction(() => !document.getElementById("sector-error"));
   assert.ok(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,
@@ -67,7 +77,7 @@ for (const width of [375, 768, 1024, 1440]) {
       .getByRole("radio", { name: /Proposez-moi un style/ })
       .isChecked(),
   );
-  assert.equal(await page.locator(".lead-inspiration-card").count(), 6);
+  assert.equal(await page.locator(".lead-inspiration-card").count(), 9);
   await page
     .locator(".lead-inspiration-photo img")
     .evaluateAll(async (imgs) => {
@@ -84,7 +94,7 @@ for (const width of [375, 768, 1024, 1440]) {
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   );
-  await page.getByText("Maison Camille", { exact: true }).click();
+  await page.getByText(exampleName, { exact: true }).click();
   await page
     .locator(".form-layout")
     .screenshot({ path: "reports/form/inspiration-" + width + ".png" });
@@ -141,7 +151,7 @@ for (const width of [375, 768, 1024, 1440]) {
     .fill("Plombier : salles de bains et dépannage");
   await page.getByRole("button", { name: "Continuer", exact: true }).click();
   assert.ok(
-    await page.getByRole("radio", { name: /Maison Camille/ }).isChecked(),
+    await page.locator(`input[name="style"][value="${style}"]`).isChecked(),
   );
   await page.getByRole("button", { name: "Continuer", exact: true }).click();
   assert.equal(
@@ -161,7 +171,7 @@ for (const width of [375, 768, 1024, 1440]) {
     .waitFor();
   assert.equal(posts, 1);
   assert.equal(lastPayload.phone, "");
-  assert.equal(lastPayload.style, "coiffure");
+  assert.equal(lastPayload.style, style);
   assert.equal(lastPayload.contactMethod, "email");
   for (const field of [
     "description",

@@ -110,6 +110,12 @@
 .portfolio-salon .portfolio-preview {
   background: #e4d8cc;
 }
+.portfolio-restaurant .portfolio-preview { background: #312a23; }
+.portfolio-photographer .portfolio-preview { background: #2c2c2b; }
+.portfolio-automotive .portfolio-preview { background: #162735; }
+.portfolio-restaurant .portfolio-preview-label,
+.portfolio-photographer .portfolio-preview-label,
+.portfolio-automotive .portfolio-preview-label { color: #e8e8df; }
 .portfolio-consulting .portfolio-preview {
   background: #d3dce2;
 }

@@ -21,6 +21,9 @@ export function Header() {
     if (!open) return;
     const previous = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+    const desktop = window.matchMedia("(min-width: 1024px)");
+    const closeOnDesktop = () => { if (desktop.matches) setOpen(false); };
+    desktop.addEventListener("change", closeOnDesktop);
     const links = panel.current?.querySelectorAll<HTMLElement>("a,button");
     links?.[0]?.focus();
     const key = (e: KeyboardEvent) => {
@@ -47,6 +50,7 @@ export function Header() {
     return () => {
       document.body.style.overflow = previous;
       document.removeEventListener("keydown", key);
+      desktop.removeEventListener("change", closeOnDesktop);
     };
   }, [open]);
   return (

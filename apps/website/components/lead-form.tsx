@@ -72,6 +72,7 @@ export function LeadForm({ enabled, antiBot }: { enabled: boolean; antiBot: Anti
     },
   });
   const contactMethod = useWatch({ control, name: "contactMethod" });
+  const sector = useWatch({ control, name: "sector" });
   useEffect(() => {
     setValue("requestId", crypto.randomUUID());
     const params = new URLSearchParams(window.location.search);
@@ -386,6 +387,8 @@ export function LeadForm({ enabled, antiBot }: { enabled: boolean; antiBot: Anti
                   <select
                     id="sector"
                     {...register("sector")}
+                    value={sector || ""}
+                    onChange={(event) => setValue("sector", event.target.value as Lead["sector"], { shouldDirty: true, shouldValidate: true })}
                     aria-invalid={!!errors.sector}
                     aria-describedby={
                       errors.sector ? "sector-error" : undefined
@@ -400,7 +403,7 @@ export function LeadForm({ enabled, antiBot }: { enabled: boolean; antiBot: Anti
                       "Association",
                       "Autre",
                     ].map((v) => (
-                      <option key={v}>{v}</option>
+                      <option key={v} value={v}>{v}</option>
                     ))}
                   </select>
                   <FieldError name="sector" message={errors.sector?.message} />

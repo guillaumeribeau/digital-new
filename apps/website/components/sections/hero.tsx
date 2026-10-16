@@ -249,8 +249,8 @@ export function Hero() {
       <div className="container rx-container">
         <div className="rx-topline">
           <p>
-            <span aria-hidden="true">✳︎</span> VOTRE SITE INTERNET, SANS PRENDRE
-            DE RISQUE
+            <span aria-hidden="true">✳︎</span> CRÉATION DE SITES VITRINES POUR LES
+            PROFESSIONNELS
           </p>
           <span>ON VOUS MONTRE. VOUS DÉCIDEZ.</span>
         </div>
@@ -275,9 +275,10 @@ export function Hero() {
           </h1>
           <div className="rx-promise">
             <p>
-              Nous imaginons votre futur site internet et vous présentons une
-              première proposition gratuitement. Vous aimez le résultat ? Nous
-              nous occupons de tout pour le mettre en ligne.
+              Partout en France, découvrez une première version complète de
+              votre site vitrine de cinq pages avant de payer. Nous la préparons
+              gratuitement sous sept jours ouvrés après réception des informations
+              nécessaires. Vous décidez ensuite de commander.
             </p>
             <div className="rx-actions">
               <CTA placement="hero">Découvrir mon futur site gratuitement</CTA>

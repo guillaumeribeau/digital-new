@@ -43,6 +43,16 @@ La boîte `/emails-locaux` concerne ce module ; `npm run emails:local` reste la 
 
 Sur une nouvelle installation locale déjà configurée avec `db:setup:local`, exécuter `npm run commercial:setup:local`. Cette commande migre uniquement la base locale attendue, applique les rôles restreints et prépare les variables partagées sans effacer les données ni remplacer une clé existante. Redémarrer les deux applications après une modification des variables.
 
+## Chat visiteurs Crisp
+
+La bulle Crisp est intégrée au layout commercial du site avec l’identifiant public `dd23e69b-7b5d-4e66-bb46-50da9ce26e4c`, en français. Aucune variable Railway ni clé secrète n’est nécessaire. Le chargeur officiel est ajouté une seule fois après hydratation ; les navigations conservent la conversation. Les pages de démonstration et l’administration n’intègrent pas le widget ; la page `/confirmer-demande` n’initialise pas le chat afin de ne pas exposer ses liens privés. La bulle est masquée lorsqu’on quitte son périmètre.
+
+La bulle est immédiatement visible ; la fenêtre s’ouvre après cinq secondes une fois le SDK prêt. Un message d’accueil local est affiché avec `message:show`, sans envoyer de message à la place du visiteur. Si Crisp indique l’équipe absente, le message invite à laisser une question et une adresse e-mail. L’ouverture automatique se produit une seule fois par session de navigation (`sessionStorage`), y compris après rechargement ; une ouverture manuelle annule également la sollicitation automatique. Les conversations déjà en cours ne reçoivent pas de nouvel accueil. Le minuteur est annulé lorsqu’on quitte le périmètre du chat. Si le stockage est bloqué, un état en mémoire évite les répétitions pendant la navigation dans l’application.
+
+Répondre depuis [la boîte de réception Crisp](https://app.crisp.chat/) ou son application mobile. Dans les paramètres du workspace Crisp, vérifier le domaine `zelyweb.com`, le profil opérateur, les notifications, la disponibilité, le logo et les couleurs. Les échanges du chat restent dans Crisp, séparés des e-mails et dossiers PostgreSQL ; aucun contenu du formulaire n’est envoyé automatiquement au widget. Les délais manuels de conservation s’appliquent également aux discussions conservées dans Crisp.
+
+La confidentialité et la page cookies décrivent le fournisseur et les cookies techniques du chat, indépendants du consentement à la mesure d’audience. Documentation : [installation Next.js](https://help.crisp.chat/en/article/how-to-install-crisp-chat-widget-on-nextjs-app-xh9yse/), [commandes du widget](https://docs.crisp.chat/guides/chatbox-sdks/web-sdk/dollar-crisp/), [cookies](https://help.crisp.chat/en/article/crisp-cookie-policy-1147xor/).
+
 ## Configuration Resend en production
 
 Dans le service administrateur :

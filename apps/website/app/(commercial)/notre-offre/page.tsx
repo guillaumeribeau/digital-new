@@ -8,8 +8,8 @@ import { Pricing } from "@/components/sections/pricing";
 import { FinalCTA } from "@/components/sections/final-cta";
 import { pageMetadata } from "@/lib/seo";
 export const metadata = pageMetadata(
-  "Notre offre — Un site vitrine clé en main",
-  `Un site professionnel de cinq pages, adapté au mobile. Création à ${brand.pricing.creation} € HT, (358,80 € TTC), hébergement et gestion à ${brand.pricing.monthly} € HT/mois (34,80 € TTC). Découvrez le périmètre.`,
+  "Site vitrine de 5 pages : aperçu gratuit et tarifs",
+  `Voyez votre site avant de payer. Première version gratuite sous 7 jours ouvrés après réception du brief. Création ${brand.pricing.creation} € HT + abonnement requis ${brand.pricing.monthly} € HT/mois.`,
   "/notre-offre",
 );
 export default function Offer() {
@@ -19,7 +19,7 @@ export default function Offer() {
         label="L’OFFRE, SANS PETITES LIGNES CACHÉES"
         title="Tout ce qu’il faut."
         accent="Rien de compliqué."
-        description="Un site vitrine pour présenter votre activité, inspirer confiance et faciliter le premier contact. Nous créons. Nous mettons en ligne. Nous gérons la technique."
+        description="Un site vitrine de cinq pages pour les professionnels partout en France. Découvrez gratuitement une première version complète sur un aperçu privé avant de commander. Après acceptation et paiement, nous réalisons les ajustements, puis la mise en ligne."
       />
 
       <section className="offer-onepage" aria-labelledby="onepage-title">
@@ -120,7 +120,7 @@ export default function Offer() {
               ))}
             </div>
             <Link className="offer-onepage-link" href="/exemples">
-              Explorer les 6 univers <ArrowUpRight size={19} />
+              Explorer les 9 univers <ArrowUpRight size={19} />
             </Link>
           </div>
         </div>

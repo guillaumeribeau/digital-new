@@ -17,9 +17,11 @@ export default function Cookies() {
       <article className="container legal-content">
         <h2>La configuration actuelle</h2>
         <p>
-          Sans identifiant Google Tag Manager configuré, aucun outil de mesure
-          Google n’est chargé. Le site prépare une intégration soumise à votre
-          accord préalable.
+          Google Analytics 4 mesure la fréquentation, les pages consultées,
+          la provenance des visites et les interactions avec les boutons et le
+          formulaire. Il est chargé uniquement après votre acceptation. Sans
+          votre accord, aucune requête vers Google Analytics n’est déclenchée
+          par cette intégration.
         </p>
         <h2>La mémorisation de votre choix</h2>
         <p>
@@ -28,17 +30,49 @@ export default function Cookies() {
           contient aucune coordonnée personnelle. Elle est supprimée lorsque
           vous effacez les données du site.
         </p>
-        <h2>Les outils optionnels</h2>
+        <h2>Les cookies de mesure</h2>
         <p>
-          Les éventuels services Google Analytics et Google Ads devront être
-          configurés dans le conteneur, avec les réglages de consentement
-          appropriés. La liste définitive des traceurs, leurs finalités et leurs
-          durées de vie devra être renseignée avant activation.
+          Google Analytics utilise les cookies _ga et _ga_TDLF1WPKD4 pour distinguer
+          les visiteurs et leurs sessions. Leur expiration est configurée à un an,
+          sans renouvellement à chaque visite. Les fonctions de personnalisation
+          publicitaire et Google signals sont désactivées dans notre intégration.
+          Aucun pixel publicitaire Meta, Google Ads ou autre n’est installé par
+          ce suivi.
+        </p>
+        <p>
+          Les événements personnalisés ne contiennent pas les coordonnées ni les
+          textes saisis dans les formulaires. Les pages de confirmation des demandes
+          et les démonstrations ne sont pas mesurées. Les liens de campagne peuvent
+          utiliser des paramètres UTM pour identifier leur provenance.
+          Consultez les <a href="https://policies.google.com/privacy?hl=fr">informations de confidentialité de Google</a>.
+        </p>
+        <h2>La messagerie Crisp</h2>
+        <p>
+          Crisp fournit la bulle de discussion et utilise des cookies techniques
+          de session, notamment sous le préfixe crisp-client, pour reconnaître
+          votre conversation entre les pages et lors de vos retours. Leur durée
+          par défaut est de six mois, renouvelée lors d’une nouvelle visite.
+          Cette durée concerne l’identifiant de session, distinct de la durée
+          de conservation des messages.
+        </p>
+        <p>
+          La bulle reste visible et la fenêtre s’ouvre après cinq secondes.
+          Une préférence technique dans le stockage de session du navigateur
+          mémorise que l’accueil a déjà été présenté ou que vous avez ouvert
+          le chat. Elle évite de vous solliciter à nouveau pendant la navigation
+          et ne contient aucune coordonnée personnelle.
+        </p>
+        <p>
+          Le chat est indépendant de votre choix concernant la mesure d’audience.
+          Aucun nom, e-mail ou contenu du formulaire de demande n’est transmis
+          automatiquement à Crisp par notre intégration. Vous pouvez supprimer
+          la session en effaçant les cookies du site dans votre navigateur.
+          Consultez la <a href="https://help.crisp.chat/en/article/crisp-cookie-policy-1147xor/">politique de cookies de Crisp</a>.
         </p>
         <h2>Modifier votre choix</h2>
         <p>
           Vous pouvez revenir sur votre préférence. Le refus empêche le
-          chargement du conteneur lors des prochaines visites. Si des services
+          chargement de Google Analytics lors des prochaines visites. Si des services
           ont déjà déposé des cookies, vous pouvez également les effacer dans
           les paramètres de votre navigateur.
         </p>

@@ -831,16 +831,15 @@ a {
     font-size: 9px;
   }
 }
-@media (max-width: 767px) {
-  .container,
-  .header-inner {
-    width: calc(100% - 40px);
-  }
-  .header-inner {
-    height: 73px;
-  }
-  .logo {
-    width: 144px;
+.mobile-nav {
+  display: none;
+}
+@media (max-width: 1023px) {
+  .header {
+    background: var(--paper);
+    /* A backdrop filter makes fixed children use the header as their viewport. */
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
   }
   .desktop-nav,
   .header-cta {
@@ -851,13 +850,16 @@ a {
   }
   .mobile-nav {
     position: fixed;
-    inset: 73px 0 0;
+    inset: 90px 0 0;
     background: var(--blue);
     color: white;
     padding: 40px 25px;
     display: flex;
     flex-direction: column;
     gap: 20px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-bottom: max(25px, env(safe-area-inset-bottom));
     animation: menu-in 0.25s ease;
   }
   .mobile-nav > a {
@@ -882,6 +884,21 @@ a {
     font-size: 13px;
     color: #cbd6ff;
     margin-top: auto;
+  }
+}
+@media (max-width: 767px) {
+  .container,
+  .header-inner {
+    width: calc(100% - 40px);
+  }
+  .header-inner {
+    height: 73px;
+  }
+  .logo {
+    width: 144px;
+  }
+  .mobile-nav {
+    top: 73px;
   }
   .hero {
     display: flex;
