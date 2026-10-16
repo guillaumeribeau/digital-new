@@ -19,7 +19,7 @@ export const metadata: Metadata = {
     default: brand.name + " — Création de site vitrine, voyez avant de payer",
     template: "%s | " + brand.name,
   },
-  description: `Création de sites vitrines pour les professionnels partout en France. Voyez votre site avant de payer : ${brand.pricing.creation} € HT à la commande, puis abonnement requis à ${brand.pricing.monthly} € HT/mois à la publication.`,
+  description: `Création de sites vitrines pour les professionnels partout en France. Voyez votre site avant de payer : ${brand.pricing.creation} € HT à la commande, puis abonnement requis à ${brand.pricing.monthly} € HT/mois, à activer avant publication.`,
   openGraph: {
     type: "website",
     locale: "fr_FR",

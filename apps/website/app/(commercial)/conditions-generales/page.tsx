@@ -6,7 +6,7 @@ export const metadata = pageMetadata("Conditions de l’offre", "Création du si
 export default function Conditions() {
   return <><PageIntro label="LE CADRE DE NOTRE COLLABORATION" title="Des conditions claires." description="De la première version gratuite à la récupération de votre site : les prestations, les prix et vos possibilités de départ." />
     <article className="container legal-content">
-      <p>Version du 15 octobre 2026. Prestataire : {business.legalName}, {business.address}, SIRET {business.siret}, TVA {business.vatNumber}. Contact : <a href={`mailto:${business.email}`}>{business.email}</a>.</p>
+      <p>Version du 16 octobre 2026. Prestataire : {business.legalName}, {business.address}, SIRET {business.siret}, TVA {business.vatNumber}. Contact : <a href={`mailto:${business.email}`}>{business.email}</a>.</p>
       <p>Ces conditions décrivent l’offre destinée aux professionnels, associations et particuliers. La demande initiale et l’aperçu privé sont gratuits et ne constituent pas une commande payante. Le périmètre, les délais et les conditions applicables sont remis avec la proposition avant acceptation ; un devis complémentaire accepté définit les éventuelles prestations supplémentaires.</p>
       {offerSections.map(section => <section key={section.title}><h2>{section.title}</h2><p>{section.text}</p></section>)}
       <h2>Rétractation des consommateurs</h2>

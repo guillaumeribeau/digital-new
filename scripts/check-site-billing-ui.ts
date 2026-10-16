@@ -36,7 +36,7 @@ async function main() {
     await card.locator("iframe").waitFor();
     await card.screenshot({ path: "reports/billing/admin-presentation.png" });
     const iframe = card.frameLocator("iframe");
-    await iframe.getByText("Votre site est prêt", { exact: false }).waitFor();
+    await iframe.getByText("Découvrez votre site.", { exact: false }).waitFor();
     const srcdoc = await card.locator("iframe").getAttribute("srcdoc"); assert.ok(srcdoc);
     await writeFile("reports/billing/email-apercu.html", srcdoc);
     const mail = await ctx.newPage();
@@ -65,6 +65,42 @@ async function main() {
     await portal.screenshot({ path: "reports/billing/client-mobile.png", fullPage: true });
     await portal.setViewportSize({ width: 1440, height: 1000 });
     await portal.screenshot({ path: "reports/billing/client-desktop.png", fullPage: true });
+    // Simulated signed-payment outcome in this isolated database; no real Stripe call.
+    await db.siteOrder.update({ where: { id: order.id }, data: { status: "PAID", creationPaidAt: new Date(), stripeCustomerId: "cus_ui_fixture" } });
+    await page.reload();
+    await card.getByRole("button", { name: "Prévisualiser l’e-mail d’ajustements" }).click();
+    const revisions = card.frameLocator('iframe[title="Aperçu de l’e-mail d’ajustements"]');
+    await revisions.getByRole("heading", { name: "Paiement reçu : préparons vos ajustements" }).waitFor();
+    const revisionsHtml = await card.locator('iframe[title="Aperçu de l’e-mail d’ajustements"]').getAttribute("srcdoc");
+    await writeFile("reports/billing/email-ajustements.html", revisionsHtml!);
+    await card.getByLabel("Questions et message pour les ajustements").fill("Voici mes questions personnalisées pour vos textes et photos.");
+    assert.equal(await card.getByRole("button", { name: "Envoyer les questions et la confirmation au client" }).isDisabled(), true);
+    await card.getByRole("button", { name: "Prévisualiser l’e-mail d’ajustements" }).click();
+    await card.getByRole("button", { name: "Envoyer les questions et la confirmation au client" }).click();
+    await card.getByText("E-mail d’ajustements ajouté à la file d’envoi.", { exact: false }).waitFor();
+    await db.project.update({ where: { id: project.id }, data: { websiteUrl: "https://atelier-fictif.example.com" } });
+    await page.reload();
+    await card.getByRole("checkbox", { name: "Les ajustements sont validés", exact: false }).check();
+    await card.getByRole("button", { name: "Préparer l’e-mail de mise en ligne" }).click();
+    const invitationHtml = await card.locator('iframe[title="Aperçu de l’e-mail de mise en ligne"]').getAttribute("srcdoc");
+    assert.ok(invitationHtml?.includes("2 jours ouvrés"));
+    await writeFile("reports/billing/email-abonnement.html", invitationHtml!);
+    for (const [kind, html] of [["ajustements", revisionsHtml!], ["abonnement", invitationHtml!]]) {
+      for (const width of [375, 640]) {
+        await mail.setViewportSize({ width, height: 1000 }); await mail.setContent(html);
+        await mail.evaluate(async () => { await Promise.all([...document.images].map(i => i.decode().catch(() => {}))); });
+        assert.equal(await mail.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+        await mail.screenshot({ path: `reports/billing/email-${kind}-${width}.png`, fullPage: true });
+      }
+    }
+    await card.getByRole("button", { name: "Envoyer l’e-mail d’activation au client" }).click();
+    await card.getByText("Invitation envoyée · activation", { exact: false }).waitFor();
+    await portal.reload();
+    await portal.getByRole("heading", { name: "Votre site est prêt à être lancé." }).waitFor();
+    await portal.setViewportSize({ width: 390, height: 844 });
+    assert.equal(await portal.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+    await portal.screenshot({ path: "reports/billing/client-subscription-mobile.png", fullPage: true });
+    await card.screenshot({ path: "reports/billing/admin-subscription.png" });
     await client.close();
     assert.deepEqual(errors, []);
     console.log("UI paiement : préparation, prix personnalisé, prévisualisation, protection contre les changements, e-mail en file locale et accès privé sans compte validés.");

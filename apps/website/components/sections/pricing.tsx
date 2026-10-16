@@ -66,7 +66,7 @@ export function Pricing() {
               ))}
             </ul>
             <p className="price-conditions">
-              Abonnement obligatoire à la publication, résiliable à tout moment pour la fin de la période payée. Temps non reportable. Supplément annuel de domaine uniquement avec votre accord. TVA 20 %.
+              Abonnement obligatoire à activer avant la publication, résiliable à tout moment pour la fin de la période payée. Temps non reportable. Supplément annuel de domaine uniquement avec votre accord. TVA 20 %.
             </p>
           </div>
         </div>

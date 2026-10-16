@@ -11,7 +11,7 @@ const stages = [
   { title: "Vous nous racontez", text: "Votre métier, vos prestations, vos envies. Quelques informations pour démarrer.", label: "Votre demande", note: "Tout commence par votre activité.", Icon: Send },
   { title: "Votre site prend forme", text: "Votre site complet de cinq pages, gratuitement sur aperçu privé, sous sept jours ouvrés après réception des informations nécessaires.", label: "La proposition gratuite", note: "Une première direction, à découvrir avant de payer.", Icon: Sparkles },
   { title: "Vous gardez la main", text: "La première version vous plaît ? Vous payez la création, puis nous réalisons trois séries de retours regroupés sous 30 jours.", label: "Votre décision", note: "Vous décidez de la suite, en toute connaissance.", Icon: MessageSquare },
-  { title: "Bienvenue sur le web", text: "Après les ajustements et votre validation, nous publions votre site. L’abonnement commence à la mise en ligne.", label: "La mise en ligne", note: "Votre activité a maintenant son adresse sur le web.", Icon: Globe },
+  { title: "Bienvenue sur le web", text: "Après les ajustements et votre validation, nous publions votre site. Vous activez l’abonnement depuis un e-mail après les ajustements ; nous publions sous 2 jours ouvrés après confirmation du premier paiement, si le domaine est prêt.", label: "La mise en ligne", note: "Votre activité a maintenant son adresse sur le web.", Icon: Globe },
 ];
 
 export function ProjectJourney() {

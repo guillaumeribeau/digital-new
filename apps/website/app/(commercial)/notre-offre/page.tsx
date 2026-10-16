@@ -189,7 +189,7 @@ export default function Offer() {
           <span className="eyebrow">VOTRE COLLABORATION AVEC ZELYWEB</span>
           <h3>Vous découvrez. Vous validez. Nous ajustons.</h3>
           <p>La première version complète est gratuite sur aperçu privé. Après acceptation, vous réglez la création, puis nous réalisons jusqu’à trois séries de retours regroupés dans les 30 jours. Les textes, photos, couleurs et ajustements de présentation sont inclus ; les nouvelles fonctionnalités sont chiffrées séparément.</p>
-          <p>L’abonnement commence à la publication. À votre départ, les fichiers et le code de transfert du domaine sont remis gratuitement. La migration technique par Zelyweb est facultative : 150 € HT, soit 180 € TTC.</p>
+          <p>Après validation des ajustements, vous activez l’abonnement depuis un e-mail. Le premier mois est payé avant la mise en ligne, prévue sous 2 jours ouvrés si le domaine est prêt. À votre départ, les fichiers et le code de transfert du domaine sont remis gratuitement. La migration technique par Zelyweb est facultative : 150 € HT, soit 180 € TTC.</p>
           <Link href="/conditions-generales">Lire les conditions de l’offre</Link>
         </div>
       </section>

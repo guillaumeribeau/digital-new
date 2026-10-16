@@ -440,6 +440,9 @@ model SiteOrder {
   consentText           String? @db.Text
   acceptedName          String? @db.VarChar(200)
   creationPaidAt        DateTime? @db.Timestamptz(3)
+  revisionEmailVersion  Int @default(0)
+  revisionEmailMessage  String? @db.VarChar(5000)
+  revisionEmailSentAt   DateTime? @db.Timestamptz(3)
   stripeCustomerId      String? @unique @db.VarChar(200)
   stripeSessionId       String? @unique @db.VarChar(200)
   checkoutAttempt       String? @db.Uuid
@@ -448,6 +451,14 @@ model SiteOrder {
   paymentMethodId       String? @db.VarChar(200)
   stripeSubscriptionId  String? @unique @db.VarChar(200)
   subscriptionAttempt   String? @db.Uuid
+  subscriptionInviteVersion Int @default(0)
+  subscriptionWebsiteUrl String? @db.VarChar(1000)
+  subscriptionInviteSentAt DateTime? @db.Timestamptz(3)
+  subscriptionConsentAt DateTime? @db.Timestamptz(3)
+  subscriptionConsentText String? @db.Text
+  subscriptionCheckoutSessionId String? @unique @db.VarChar(200)
+  subscriptionCheckoutUrl String? @db.VarChar(2000)
+  subscriptionCheckoutExpiresAt DateTime? @db.Timestamptz(3)
   subscriptionStatus    String? @db.VarChar(40)
   firstSubscriptionPaidAt DateTime? @db.Timestamptz(3)
   cancelAtPeriodEnd     Boolean @default(false)

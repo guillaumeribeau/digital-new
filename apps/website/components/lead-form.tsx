@@ -544,7 +544,7 @@ export function LeadForm({ enabled, antiBot }: { enabled: boolean; antiBot: Anti
                     aria-invalid={!!errors.pricingAcknowledged}
                     aria-describedby={errors.pricingAcknowledged ? "pricingAcknowledged-error" : undefined} />
                   <span>J’ai pris connaissance des tarifs : première proposition gratuite,
-                    création de cinq pages à 299 € HT (358,80 € TTC) après acceptation, puis abonnement obligatoire à la publication à 29 € HT (34,80 € TTC)/mois, résiliable à tout moment. Hébergement, domaine jusqu’à 20 € HT/an et une modification de 15 min maximum par mois inclus.</span>
+                    création de cinq pages à 299 € HT (358,80 € TTC) après acceptation, puis abonnement obligatoire à activer avant la publication à 29 € HT (34,80 € TTC)/mois, résiliable à tout moment. Hébergement, domaine jusqu’à 20 € HT/an et une modification de 15 min maximum par mois inclus.</span>
                 </label>
                 <FieldError name="pricingAcknowledged" message={errors.pricingAcknowledged?.message} />
                 <label>

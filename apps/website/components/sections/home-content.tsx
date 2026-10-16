@@ -132,7 +132,7 @@ export function HomeContent() {
                 {
                   Icon: Wrench,
                   title: "La gestion technique",
-                  text: "Hébergement, domaine et une modification de 15 minutes maximum par mois. L’abonnement commence à la publication.",
+                  text: "Hébergement, domaine et une modification de 15 minutes maximum par mois. Après validation des ajustements, vous activez l’abonnement depuis un e-mail. Le premier mois est payé avant la mise en ligne, prévue sous 2 jours ouvrés si le domaine est prêt.",
                 },
               ].map(({ Icon, title, text }, i) => (
                 <Reveal className="nh-service-row" key={title}>

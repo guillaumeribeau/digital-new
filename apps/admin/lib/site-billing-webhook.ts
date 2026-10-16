@@ -3,8 +3,8 @@ import { getDb } from "@nova/database";
 import { z } from "zod";
 import { CommercialError, paymentMode } from "./commercial-core";
 import { stripeClient } from "./commercial-payment";
-import { creationTtc } from "./site-billing-shared";
-import { queueSiteNotice, storeBillingInvoice, syncSiteSubscription } from "./site-billing";
+import { billingMoney, creationTtc } from "./site-billing-shared";
+import { queueSiteNotice, queueOwnerBillingNotice, storeBillingInvoice, syncSiteSubscription } from "./site-billing";
 
 export async function applySiteBillingEvent(event: Stripe.Event) {
   const mode = event.livemode ? "LIVE" : "TEST";
@@ -17,15 +17,37 @@ export async function applySiteBillingEvent(event: Stripe.Event) {
     const id = session.metadata?.siteOrderId;
     if (!z.uuid().safeParse(id).success || session.payment_status !== "paid") return;
     const current = await getDb().siteOrder.findUniqueOrThrow({ where: { id } });
-    if (current.checkoutAttempt !== session.metadata?.attemptId || current.version !== Number(session.metadata?.version) || current.mode !== mode || current.stripeCustomerId !== session.customer || session.amount_total !== creationTtc(current.creationHtCents) || session.currency !== "eur" || !current.consentAt) throw new CommercialError("INVALID_ACTION");
-    const intent = typeof session.payment_intent === "string" ? await stripe.paymentIntents.retrieve(session.payment_intent) : session.payment_intent;
-    const method = typeof intent?.payment_method === "string" ? intent.payment_method : intent?.payment_method?.id;
-    if (!method || intent?.status !== "succeeded") throw new CommercialError("INVALID_ACTION");
-    await getDb().$transaction(async tx => {
-      await tx.$queryRaw`SELECT "id" FROM "SiteOrder" WHERE "id" = ${current.id}::uuid FOR UPDATE`;
-      await tx.siteOrder.update({ where: { id: current.id }, data: { status: "PAID", creationPaidAt: current.creationPaidAt || new Date(), paymentMethodId: method, stripeSessionId: session.id } });
-    });
-    await queueSiteNotice(current.id, "CREATION_PAID", "Votre commande Zelyweb est confirmée", "Le paiement de la création est confirmé. Vous pouvez transmettre vos trois séries de retours regroupés dans les 30 jours : textes, photos, couleurs et ajustements de présentation. L’abonnement commencera à la mise en ligne après les ajustements.");
+    if (session.metadata?.purpose === "SITE_SUBSCRIPTION") {
+      if (current.subscriptionAttempt !== session.metadata.attemptId || current.subscriptionInviteVersion !== Number(session.metadata.inviteVersion) || !current.subscriptionConsentAt || current.mode !== mode || current.stripeCustomerId !== session.customer || session.amount_total !== creationTtc(current.monthlyHtCents) || session.currency !== "eur") throw new CommercialError("INVALID_ACTION");
+      const subscriptionId = typeof session.subscription === "string" ? session.subscription : session.subscription?.id;
+      if (!subscriptionId) throw new CommercialError("INVALID_ACTION");
+      await syncSiteSubscription(current.id, subscriptionId);
+    } else {
+      if (current.checkoutAttempt !== session.metadata?.attemptId || current.version !== Number(session.metadata?.version) || current.mode !== mode || current.stripeCustomerId !== session.customer || session.amount_total !== creationTtc(current.creationHtCents) || session.currency !== "eur" || !current.consentAt) throw new CommercialError("INVALID_ACTION");
+      const intent = typeof session.payment_intent === "string" ? await stripe.paymentIntents.retrieve(session.payment_intent) : session.payment_intent;
+      const method = typeof intent?.payment_method === "string" ? intent.payment_method : intent?.payment_method?.id;
+      if (!method || intent?.status !== "succeeded") throw new CommercialError("INVALID_ACTION");
+      await getDb().$transaction(async tx => {
+        await tx.$queryRaw`SELECT "id" FROM "SiteOrder" WHERE "id" = ${current.id}::uuid FOR UPDATE`;
+        await tx.siteOrder.update({ where: { id: current.id }, data: { status: "PAID", creationPaidAt: current.creationPaidAt || new Date(), paymentMethodId: method, stripeSessionId: session.id } });
+      });
+      await queueSiteNotice(current.id, "CREATION_PAID", "Votre commande Zelyweb est confirmée", "Le paiement de la création est confirmé. Vous recevrez un prochain e-mail avec quelques questions pour préparer vos ajustements. Vous pourrez y répondre directement avec vos modifications. Trois séries de retours regroupés sont incluses dans les 30 jours suivant ce paiement : textes, photos, couleurs et présentation. Après validation des ajustements, vous recevrez un e-mail pour activer votre abonnement. La mise en ligne aura lieu sous 2 jours ouvrés après confirmation de son premier paiement, si le domaine est prêt.");
+      await queueOwnerBillingNotice(current.id, "CREATION_PAID", "Création du site payée", `Le paiement de création de ${billingMoney(creationTtc(current.creationHtCents))} TTC est confirmé. Vous pouvez poursuivre les ajustements avec le client.`);
+    }
+  } else if (event.type === "payment_intent.payment_failed") {
+    const raw = event.data.object as Stripe.PaymentIntent;
+    if (!z.uuid().safeParse(raw.metadata?.siteOrderId).success) return;
+    const intent = await stripe.paymentIntents.retrieve(raw.id);
+    const order = await getDb().siteOrder.findUniqueOrThrow({ where: { id: raw.metadata.siteOrderId } });
+    if (order.mode !== mode || order.stripeCustomerId !== intent.customer || intent.metadata.siteOrderId !== order.id || intent.amount !== creationTtc(order.creationHtCents) || intent.currency !== "eur") throw new CommercialError("INVALID_ACTION");
+    if (intent.status === "requires_payment_method" && !order.creationPaidAt) await queueOwnerBillingNotice(order.id, "PAYMENT_FAILED/" + intent.id + "/" + event.id, "Échec du paiement de création", "La tentative de paiement de création a échoué. Consultez Stripe et la fiche projet avant de contacter le client.");
+  } else if (event.type === "checkout.session.async_payment_failed") {
+    const session = event.data.object as Stripe.Checkout.Session;
+    if (!z.uuid().safeParse(session.metadata?.siteOrderId).success) return;
+    const order = await getDb().siteOrder.findUniqueOrThrow({ where: { id: session.metadata!.siteOrderId } });
+    if (order.mode !== mode || order.stripeCustomerId !== session.customer) throw new CommercialError("INVALID_ACTION");
+    const currentSession = await stripe.checkout.sessions.retrieve(session.id);
+    if (currentSession.payment_status !== "paid") await queueOwnerBillingNotice(order.id, "PAYMENT_FAILED/" + session.id, "Échec de paiement client", "Le paiement n’a pas abouti. Consultez Stripe et la fiche projet avant de contacter le client. Aucune suspension automatique.");
   } else if (event.type.startsWith("customer.subscription.")) {
     const sub = event.data.object as Stripe.Subscription;
     const id = sub.metadata?.siteOrderId;
@@ -45,9 +67,10 @@ export async function applySiteBillingEvent(event: Stripe.Event) {
       if (subscriptionId) {
         await syncSiteSubscription(order.id, subscriptionId);
         if (invoice.status !== "paid" && (event.type === "invoice.payment_failed" || event.type === "invoice.payment_action_required")) {
+          await queueOwnerBillingNotice(order.id, "PAYMENT_FAILED/" + invoice.id, "Paiement d’abonnement à régulariser", `Un paiement d’abonnement nécessite une intervention. Facture : ${invoice.id}. Consultez le suivi dans l’admin. Aucune suspension automatique du site.`);
           await queueSiteNotice(order.id, invoice.id + "/" + event.type, "Votre abonnement Zelyweb : paiement à régulariser", `Un paiement nécessite votre intervention. Vous pouvez consulter la facture et mettre à jour votre carte dans votre portail client.${invoice.hosted_invoice_url ? "\n\nRégler la facture : " + invoice.hosted_invoice_url : ""}`);
         }
-        if (invoice.status === "paid" && invoice.amount_paid === creationTtc(order.monthlyHtCents) && invoice.currency === "eur" && invoice.billing_reason === "subscription_create") await queueSiteNotice(order.id, "SUBSCRIPTION_ACTIVE", "Votre abonnement Zelyweb est activé", "Le premier paiement mensuel est confirmé. Votre abonnement est activé ; Zelyweb peut finaliser la mise en ligne de votre site. Vos factures et la gestion de votre abonnement sont disponibles depuis votre portail client.");
+        if (invoice.status === "paid" && invoice.amount_paid === creationTtc(order.monthlyHtCents) && invoice.currency === "eur" && invoice.billing_reason === "subscription_create") await queueSiteNotice(order.id, "SUBSCRIPTION_ACTIVE", "Votre abonnement Zelyweb est activé", "Le premier paiement mensuel est confirmé et votre abonnement est activé. Votre site sera mis en ligne sur le domaine définitif sous 2 jours ouvrés, si le domaine et ses accès sont prêts. Vos factures et la gestion de votre abonnement sont disponibles depuis votre portail client.");
       }
     } else if (z.uuid().safeParse(invoice.metadata?.quoteId).success) {
       const quote = await getDb().quote.findUniqueOrThrow({ where: { id: invoice.metadata!.quoteId } });

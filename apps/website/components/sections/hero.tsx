@@ -308,7 +308,7 @@ export function Hero() {
             </ul>
             <p className="rx-terms">
               Vous payez la création uniquement si vous commandez après
-              validation de la première version complète. Abonnement requis à la publication, sans durée minimale.
+              validation de la première version complète. Abonnement à activer avant la publication, sans durée minimale.
             </p>
           </div>
           <div className="rx-zero" aria-hidden="true">
