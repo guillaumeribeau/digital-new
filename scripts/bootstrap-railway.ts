@@ -31,6 +31,7 @@ async function main() {
       await db.query(`GRANT USAGE ON SCHEMA public TO "${item.name}"`);
     }
     const web = `"${roles.website.name}"`, admin = `"${roles.admin.name}"`, worker = `"${roles.worker.name}"`;
+    await db.query(`GRANT SELECT (migration_name, checksum, finished_at, rolled_back_at) ON "_prisma_migrations" TO ${web}, ${admin}, ${worker}`);
     await db.query(`GRANT SELECT, INSERT ON "Lead" TO ${web}`);
     await db.query(`GRANT UPDATE ("status", "emailVerifiedAt", "updatedAt") ON "Lead" TO ${web}`);
     await db.query(`GRANT SELECT, INSERT, UPDATE ON "EmailVerificationToken", "OutboxEvent" TO ${web}`);

@@ -81,7 +81,8 @@ export const snapshotSchema = z.object({
 });
 export type QuoteSnapshot = z.infer<typeof snapshotSchema>;
 export const emailSchema = z.object({ from: z.string(), to: z.array(z.email()).min(1).max(1), subject: z.string().max(300), text: z.string().max(100000),
+  html: z.string().max(500000).optional(),
   reply_to: z.string().optional(), headers: z.record(z.string(), z.string()).optional(),
-  attachments: z.array(z.object({ filename: z.string().max(150), content: z.string().max(4000000) })).max(1).optional(),
+  attachments: z.array(z.object({ filename: z.string().max(150), content: z.string().max(4000000), content_id: z.string().max(100).optional() })).max(1).optional(),
 });
 export type CommercialEmailPayload = z.infer<typeof emailSchema>;

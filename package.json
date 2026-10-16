@@ -19,6 +19,8 @@
     "db:generate": "prisma generate",
     "db:validate": "prisma validate",
     "db:migrate:deploy": "prisma migrate deploy",
+    "db:migrate:wait": "tsx scripts/wait-for-migrations.ts",
+    "db:migrate:wait:worker": "tsx scripts/wait-for-migrations.ts --worker",
     "db:setup:local": "tsx scripts/setup-local-db.ts",
     "commercial:setup:local": "tsx scripts/configure-commercial-local.ts",
     "outbox:once": "tsx scripts/process-outbox.ts",

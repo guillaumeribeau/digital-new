@@ -1,9 +1,10 @@
 [build]
 builder = "RAILPACK"
 buildCommand = "npm run build:admin"
-watchPatterns = ["/apps/admin/**", "/packages/**", "/package.json", "/package-lock.json", "/prisma.config.ts", "/railway.admin.toml"]
+watchPatterns = ["/apps/admin/**", "/packages/**", "/package.json", "/package-lock.json", "/prisma.config.ts", "/scripts/wait-for-migrations.ts", "/railway.admin.toml"]
 
 [deploy]
+preDeployCommand = ["npm run db:migrate:wait"]
 startCommand = "npm run start:admin -- --hostname 0.0.0.0"
 healthcheckPath = "/connexion"
 healthcheckTimeout = 120

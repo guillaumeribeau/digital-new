@@ -7,6 +7,8 @@ import { AdminAccessError } from "../lib/access";
 import { z } from "zod";
 
 const messages: Record<string, string> = {
+  CREATION_PAYMENT_REQUIRED: "Le paiement Stripe de la création doit être confirmé avant cette étape.",
+  SUBSCRIPTION_PAYMENT_REQUIRED: "Le premier paiement de l’abonnement doit être confirmé avant la mise en ligne. Consultez le bloc Stripe du projet.",
   STALE_STATUS: "Cette fiche a été modifiée. Rechargez-la avant de réessayer.",
   INVALID_TRANSITION: "Ce changement de statut n’est pas autorisé.",
   USE_PROJECT_STATUS: "Modifiez le suivi depuis le projet associé.", NOT_QUALIFIED: "La demande doit être vérifiée et qualifiée.",

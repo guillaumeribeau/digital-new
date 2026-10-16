@@ -2,6 +2,7 @@ import { getDb, Prisma } from "@nova/database";
 import { leadTransitions, leadStatusForStage, nextProjectStages, type LeadStatusCode, type ProjectStageCode } from "@nova/shared";
 import { z } from "zod";
 import { authenticate } from "./access";
+import { paymentMode } from "./commercial-core";
 
 export class BusinessError extends Error {}
 const uuid = z.uuid();
@@ -149,6 +150,11 @@ export const adminService = {
       if (!project || project.stage !== data.expected) throw new BusinessError("STALE_STATUS");
       if (!nextProjectStages(project.stage).includes(data.stage as ProjectStageCode)) throw new BusinessError("INVALID_TRANSITION");
       if (data.stage === "PUBLISHED" && !project.websiteUrl) throw new BusinessError("WEBSITE_URL_REQUIRED");
+        if (["PAID", "PUBLISHING", "PUBLISHED"].includes(data.stage)) {
+          const billing = await tx.siteOrder.findUnique({ where: { projectId: project.id } });
+          if (!billing?.creationPaidAt || !["TEST", "LIVE"].includes(paymentMode()) || billing.mode !== paymentMode()) throw new BusinessError("CREATION_PAYMENT_REQUIRED");
+          if (["PUBLISHING", "PUBLISHED"].includes(data.stage) && (!billing.firstSubscriptionPaidAt || billing.subscriptionStatus !== "active" || billing.billingAlert)) throw new BusinessError("SUBSCRIPTION_PAYMENT_REQUIRED");
+        }
       if (["PREVIEW_SENT", "AWAITING_APPROVAL"].includes(data.stage) && !project.previewUrl) throw new BusinessError("PREVIEW_URL_REQUIRED");
       await tx.project.update({ where: { id: project.id }, data: { stage: data.stage as ProjectStageCode } });
       await tx.lead.update({ where: { id: project.leadId }, data: { status: leadStatusForStage(data.stage as ProjectStageCode) } });

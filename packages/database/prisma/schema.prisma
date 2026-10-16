@@ -168,6 +168,7 @@ model Project {
   notes           InternalNote[]
   activityLogs    ActivityLog[]
   quotes          Quote[]
+  siteOrder       SiteOrder?
   @@index([stage, createdAt])
 }
 
@@ -419,6 +420,57 @@ model PaymentAttempt {
   paidAt          DateTime? @db.Timestamptz(3)
   quote           Quote @relation(fields: [quoteId], references: [id], onDelete: Restrict)
   @@index([quoteId, createdAt])
+}
+
+model SiteOrder {
+  id                    String @id @default(uuid()) @db.Uuid
+  projectId             String @unique @db.Uuid
+  version               Int @default(1)
+  creationHtCents       Int @default(29900)
+  monthlyHtCents        Int @default(2900)
+  previewUrl            String @db.VarChar(1000)
+  screenshot            String @db.Text
+  message               String @db.VarChar(5000)
+  status                String @default("DRAFT") @db.VarChar(30)
+  mode                  String @db.VarChar(10)
+  tokenHash             String @unique @db.Char(64)
+  tokenEncrypted        String @db.Text
+  sentAt                DateTime? @db.Timestamptz(3)
+  consentAt             DateTime? @db.Timestamptz(3)
+  consentText           String? @db.Text
+  acceptedName          String? @db.VarChar(200)
+  creationPaidAt        DateTime? @db.Timestamptz(3)
+  stripeCustomerId      String? @unique @db.VarChar(200)
+  stripeSessionId       String? @unique @db.VarChar(200)
+  checkoutAttempt       String? @db.Uuid
+  checkoutUrl           String? @db.VarChar(2000)
+  checkoutExpiresAt     DateTime? @db.Timestamptz(3)
+  paymentMethodId       String? @db.VarChar(200)
+  stripeSubscriptionId  String? @unique @db.VarChar(200)
+  subscriptionAttempt   String? @db.Uuid
+  subscriptionStatus    String? @db.VarChar(40)
+  firstSubscriptionPaidAt DateTime? @db.Timestamptz(3)
+  cancelAtPeriodEnd     Boolean @default(false)
+  billingAlert          Boolean @default(false)
+  lastInvoiceUrl        String? @db.VarChar(2000)
+  createdAt             DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt             DateTime @updatedAt @db.Timestamptz(3)
+  project               Project @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  invoices              BillingInvoice[]
+}
+
+model BillingInvoice {
+  id                    String @id @db.VarChar(200)
+  siteOrderId           String? @db.Uuid
+  quoteId               String? @db.Uuid
+  status                String @db.VarChar(30)
+  amountCents           Int
+  hostedUrl             String? @db.VarChar(2000)
+  pdfUrl                String? @db.VarChar(2000)
+  createdAt             DateTime @default(now()) @db.Timestamptz(3)
+  siteOrder             SiteOrder? @relation(fields: [siteOrderId], references: [id], onDelete: Restrict)
+  @@index([siteOrderId, createdAt])
+  @@index([quoteId])
 }
 
 model CommercialEmail {

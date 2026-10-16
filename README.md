@@ -95,6 +95,8 @@ Contrôle navigateur sans envoi réel : démarrer le site sur le port 3100, puis
 
 ## Déploiement Railway
 
+Les mises à jour PostgreSQL peuvent être appliquées automatiquement par un service `migrations` séparé ; les trois applications attendent la réussite des migrations avant de démarrer. Une configuration initiale des services Railway est requise. Voir les [commandes et variables exactes](docs/railway-monorepo.md#migrations-automatiques--configuration-initiale-unique). La connexion propriétaire reste exclusivement dans le service de migrations ; les applications conservent leurs comptes restreints.
+
 Utiliser les services indépendants et commandes décrits dans [railway-monorepo.md](docs/railway-monorepo.md). Le site, l’administration et PostgreSQL sont prévus sur Railway ; Vercel reste destiné aux sites clients futurs. Le worker existant nécessite son propre processus actif. Les migrations et la création du premier administrateur sont des commandes opérateur contrôlées. Les fichiers `railway.*.toml` préparent ces services sans les créer ni les déployer. Finaliser les informations légales, les droits et la conservation avant ouverture.
 
 Aucun déploiement public n’a été effectué. L’envoi réel, la livraison des e-mails, la configuration Redis et les outils Google n’ont pas été testés avec des comptes de production.

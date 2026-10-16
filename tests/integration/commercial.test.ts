@@ -115,8 +115,9 @@ test("Stripe : montant serveur, session réutilisée, signature, mode et paiemen
   Object.assign(process.env, { STRIPE_SECRET_KEY: "sk_test_fake_fixture_only", STRIPE_WEBHOOK_SECRET: "whsec_fixture_only" });
   let calls = 0, metadata: Record<string, string> = {}, sessionId = "";
   globalThis.fetch = async (url, init) => {
+    if (String(url).endsWith("/tax_rates")) return Response.json({ id: "txr_fixture" });
     assert.ok(String(url).includes("api.stripe.com/v1/checkout/sessions")); calls++;
-    const fields = new URLSearchParams(String(init?.body)); assert.equal(fields.get("line_items[0][price_data][unit_amount]"), "14400");
+    const fields = new URLSearchParams(String(init?.body)); assert.equal(fields.get("line_items[0][price_data][unit_amount]"), "12000");
     metadata = { quoteId: id, attemptId: fields.get("metadata[attemptId]")!, documentHash: quote.documentHash! }; sessionId = "cs_test_fixture_" + randomUUID();
     return Response.json({ id: sessionId, object: "checkout.session", url: "https://checkout.stripe.com/c/pay/test-fixture", expires_at: Number(fields.get("expires_at")) });
   };
@@ -178,6 +179,17 @@ test("catalogue, relances sans doublon, paramètres figés et permissions Postgr
     await grantCommercialPermissions(operator, "commercial_test_admin", "commercial_test_worker");
   } finally { await operator.end(); }
   await db.$transaction(async (tx) => { await tx.$executeRawUnsafe('SET LOCAL ROLE commercial_test_worker'); await tx.$executeRaw`UPDATE "Quote" SET "nextReminderAt" = NOW() WHERE "id" = ${id}::uuid`; });
+  for (const role of ["commercial_test_admin", "commercial_test_worker"]) {
+    await db.$transaction(async tx => {
+      await tx.$executeRawUnsafe(`SET LOCAL ROLE "${role}"`);
+      const rows = await tx.$queryRawUnsafe<unknown[]>('SELECT migration_name, checksum, finished_at, rolled_back_at FROM "_prisma_migrations"');
+      assert.ok(rows.length >= 7);
+    });
+    await assert.rejects(db.$transaction(async tx => {
+      await tx.$executeRawUnsafe(`SET LOCAL ROLE "${role}"`);
+      await tx.$executeRawUnsafe('UPDATE "_prisma_migrations" SET finished_at = NULL');
+    }));
+  }
   await assert.rejects(db.$transaction(async (tx) => { await tx.$executeRawUnsafe('SET LOCAL ROLE commercial_test_worker'); await tx.$queryRawUnsafe('SELECT * FROM auth_user'); }));
   await assert.rejects(db.$transaction(async (tx) => { await tx.$executeRawUnsafe('SET LOCAL ROLE commercial_test_worker'); await tx.$executeRaw`UPDATE "Quote" SET "title" = 'Intrusion' WHERE "id" = ${id}::uuid`; }));
   assert.equal(commercialLocal(), true);

@@ -13,7 +13,7 @@ Le module est intégré à l’administration et à PostgreSQL. Resend assure le
 
 Un devis envoyé est figé, y compris son émetteur et ses conditions. Pour le changer avant acceptation, créer une nouvelle version : l’ancien lien est révoqué. Un devis accepté ou payé ne se réécrit pas. L’acceptation conserve le nom, la date et l’empreinte du document ; ce mécanisme n’est pas présenté comme une signature électronique qualifiée.
 
-Les montants sont en EUR, calculés en centimes côté serveur. Cette version prend en charge des quantités entières et un règlement intégral ; acomptes, remboursements et facturation comptable ne sont pas inclus.
+Les montants sont en EUR, calculés en centimes côté serveur. Cette version prend en charge des quantités entières et un règlement intégral ; les acomptes et les remboursements ne sont pas pilotés par cette interface. Stripe génère les factures des paiements par carte ; renseigner les informations légales et fiscales du compte Stripe avant utilisation réelle.
 
 ## Informations Zelyweb et offre publiée
 
@@ -115,3 +115,33 @@ npm run build:admin
 ```
 
 Les intégrations utilisent un PostgreSQL temporaire distinct : droits restreints, authentification réelle, devis figés, PDF, révisions, liens privés, acceptation, simulation, signatures et doublons. Les appels Stripe/Resend sont simulés dans ces tests. Le test navigateur couvre le parcours complet et quatre largeurs, avec rapports sous `reports/commercial`. La livraison réelle et les paiements Stripe réels nécessitent un essai après configuration de vos comptes.
+
+## Présentation du site, création et abonnement Stripe
+
+Le bloc « Présentation et paiement du site » se trouve dans `/projets/[id]`. Le client doit avoir confirmé son adresse. Renseigner le lien HTTPS privé, le prix HT (299 € par défaut, TVA 20 %), le message et une capture PNG/JPEG/WebP. La capture est redimensionnée puis enregistrée en base ; elle ne dépend pas d’un disque Railway temporaire. L’aperçu de l’e-mail est obligatoire avant l’envoi. Toute modification exige une nouvelle prévisualisation. L’envoi fige le prix et le contenu, puis ajoute l’e-mail illustré à l’outbox existante (le worker doit tourner).
+
+Le lien de paiement ouvre un portail privé sans compte. Son jeton aléatoire est stocké chiffré et sous forme d’empreinte, transmis dans le fragment de l’URL puis échangé contre un cookie HttpOnly de 30 jours. Conserver ce lien privé : il donne accès au suivi et au portail de facturation. Les pages sont noindex, sans analytics et avec `Referrer-Policy: no-referrer`. Le client accepte explicitement le prix, les CGV, la carte enregistrée et les mensualités différées. La création est réglée sur Stripe Checkout ; la notification signée est la preuve de paiement, pas la page de retour.
+
+Après les ajustements, renseigner l’URL définitive et cliquer sur « Démarrer l’abonnement et le premier paiement », avec confirmation que le site est prêt à publier. Le tarif mensuel est 29 € HT + TVA 20 %, sans essai gratuit. La transition vers publication est bloquée tant que la création et le premier paiement mensuel ne sont pas confirmés. L’action déclenche le paiement ; elle ne déploie aucun site. Publier le site immédiatement après confirmation. En cas de demande d’authentification bancaire, un e-mail renvoie vers la facture Stripe. Les impayés suivants créent une alerte dans le tableau de bord, `/paiements` et le projet, sans suspension automatique. Une première tentative expirée peut être relancée depuis le projet. Une résiliation client n’est jamais redémarrée automatiquement.
+
+Le portail Stripe propose les factures, la mise à jour de carte et la résiliation en fin de période, sans prorata. Les factures de création et d’abonnement apparaissent dans le projet, celles des devis dans leur fiche. Les devis payés après la création utilisent le même client Stripe. Si une facture de devis est antérieure à la création du client Stripe, elle reste accessible dans la fiche du devis mais ne sera pas regroupée automatiquement dans le nouveau portail.
+
+### Variables et webhook (service admin)
+
+- `STRIPE_SECRET_KEY` : clé serveur de test `sk_test_…`, puis clé réelle `sk_live_…` après activation et recette. Ne jamais mettre cette clé dans Git ou dans une variable `NEXT_PUBLIC_`.
+- `STRIPE_WEBHOOK_SECRET` : secret `whsec_…` propre au point de terminaison et au mode Stripe.
+- `COMMERCIAL_PUBLIC_URL` : origine publique du service admin, utilisée pour les liens clients et les retours de paiement.
+- `COMMERCIAL_FROM_EMAIL`, `COMMERCIAL_ENCRYPTION_KEY`, `RESEND_API_KEY` : à conserver dans l’admin et le worker pour les e-mails commerciaux. Le worker traite la même base et lance `npm run outbox:watch`.
+
+Dans Stripe, ajouter un point de terminaison `${COMMERCIAL_PUBLIC_URL}/api/webhooks/stripe` pour les événements `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `checkout.session.async_payment_failed`, `checkout.session.expired`, `invoice.finalized`, `invoice.paid`, `invoice.payment_failed`, `invoice.payment_action_required`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`. Reporter son secret dans Railway. Configurer dans Stripe les coordonnées de facturation Zelyweb, TVA, logo, factures/reçus, e-mails d’échec et relances automatiques (Billing / récupération des revenus). Les retries bancaires sont gérés par Stripe, pas par un cron de débit maison. L’intégration ne configure pas ces réglages de compte à distance.
+
+Avec le service de migrations automatiques configuré dans [railway-monorepo.md](railway-monorepo.md#migrations-automatiques--configuration-initiale-unique), la migration `20261016170000_site_billing` est appliquée automatiquement avant démarrage. En installation manuelle ou dépannage uniquement, utiliser un compte opérateur propriétaire de la base, pas le rôle runtime restreint :
+
+```sh
+cd /app
+npm run db:migrate:deploy
+```
+
+La version contenant la migration doit être présente dans le service où la commande est exécutée. La migration ajoute `SiteOrder` et `BillingInvoice` et donne les droits aux rôles `nova_admin` existants autorisés sur Project. Aucun droit nouveau n’est donné au site public. Ne pas utiliser `db push` ou `migrate reset`.
+
+Tests : `npm run test:integration` pour la base temporaire et les notifications Stripe simulées, `npx tsx scripts/test-lead-pipeline.ts --billing-ui` pour le parcours navigateur et les aperçus d’e-mail (`reports/billing`). Les tests n’envoient aucun e-mail réel et ne débitent aucune carte. La connexion API de test ne remplace pas une recette Checkout + webhook dans l’environnement déployé. Ne pas mélanger des dossiers test et live : les confirmations doivent correspondre au mode Stripe du service.

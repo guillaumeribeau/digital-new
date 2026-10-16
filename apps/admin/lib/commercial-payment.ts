@@ -44,9 +44,17 @@ export async function checkoutQuote(id: string) {
   });
   if (result.url) return result.url;
   const snapshot = snapshotSchema.parse(result.quote.snapshot);
+  const siteOrder = await getDb().siteOrder.findFirst({ where: { project: { leadId: result.quote.leadId }, mode }, select: { stripeCustomerId: true } });
+  const stripe = stripeClient();
+  const rates = new Map<number, string>();
+  for (const item of snapshot.items) if (item.taxBasisPoints && !rates.has(item.taxBasisPoints)) {
+    const rate = await stripe.taxRates.create({ display_name: "TVA", percentage: item.taxBasisPoints / 100, inclusive: false, country: "FR" }, { idempotencyKey: `quote-tax/${result.attempt.id}/${item.taxBasisPoints}` });
+    rates.set(item.taxBasisPoints, rate.id);
+  }
   const session = await stripeClient().checkout.sessions.create({
-    mode: "payment", customer_email: snapshot.buyer.email, client_reference_id: result.quote.id,
-    line_items: [{ price_data: { currency: "eur", unit_amount: result.quote.totalCents, product_data: { name: `${result.quote.number} — ${result.quote.title}` } }, quantity: 1 }],
+    mode: "payment", ...(siteOrder?.stripeCustomerId ? { customer: siteOrder.stripeCustomerId } : { customer_email: snapshot.buyer.email, customer_creation: "always" as const }), client_reference_id: result.quote.id,
+    billing_address_collection: "required", invoice_creation: { enabled: true, invoice_data: { metadata: { quoteId: id } } },
+    line_items: snapshot.items.map(item => ({ price_data: { currency: "eur", unit_amount: item.unitCents, product_data: { name: item.label } }, quantity: item.quantity, tax_rates: item.taxBasisPoints ? [rates.get(item.taxBasisPoints)!] : [] })),
     metadata: { quoteId: id, attemptId: result.attempt.id, documentHash: result.quote.documentHash! },
     payment_intent_data: { metadata: { quoteId: id, attemptId: result.attempt.id } },
     success_url: `${publicOrigin()}/client/devis/${id}?retour=paiement`, cancel_url: `${publicOrigin()}/client/devis/${id}`,
