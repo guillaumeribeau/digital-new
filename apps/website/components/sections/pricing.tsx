@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/tracked-link";
 import { Check } from "lucide-react";
 import { brand, money } from "@/config/brand.config";
 import { CTA } from "../ui/cta";

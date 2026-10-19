@@ -1,5 +1,5 @@
 import CommercialLayout from "./(commercial)/layout";
-import Link from "next/link";
+import Link from "@/components/ui/tracked-link";
 export default function NotFound() {
   return (
     <CommercialLayout>

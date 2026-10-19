@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/ui/tracked-link";
 import { CircleCheck, AlertCircle, LoaderCircle } from "lucide-react";
 import { AntiBot, type AntiBotSettings } from "./anti-bot";
 

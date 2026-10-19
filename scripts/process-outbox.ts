@@ -14,12 +14,15 @@ async function main() {
   process.on("SIGTERM", () => { stopping = true; });
   process.on("SIGINT", () => { stopping = true; });
   do {
-    try { console.log(JSON.stringify(await processOutbox())); }
-    catch (error) { console.error(JSON.stringify({ error: "outbox_processing_unavailable", reason: outboxFailureReason(error) })); if (!continuous) process.exitCode = 1; }
+    let cycleError: string | null = null;
+    try { const result = await processOutbox(); if (result.failed) cycleError = "LEAD_DELIVERY_FAILED"; console.log(JSON.stringify(result)); }
+    catch (error) { cycleError = outboxFailureReason(error); console.error(JSON.stringify({ error: "outbox_processing_unavailable", reason: outboxFailureReason(error) })); if (!continuous) process.exitCode = 1; }
     if (process.env.COMMERCIAL_ENCRYPTION_KEY) {
-      try { console.log(JSON.stringify({ commercial: await processCommercialOutbox() })); }
-      catch (error) { console.error(JSON.stringify({ error: "commercial_outbox_processing_unavailable", reason: outboxFailureReason(error) })); if (!continuous) process.exitCode = 1; }
+      try { const result = await processCommercialOutbox(); if (result.failed) cycleError = "COMMERCIAL_DELIVERY_FAILED"; console.log(JSON.stringify({ commercial: result })); }
+      catch (error) { cycleError = outboxFailureReason(error); console.error(JSON.stringify({ error: "commercial_outbox_processing_unavailable", reason: outboxFailureReason(error) })); if (!continuous) process.exitCode = 1; }
     }
+    if (!process.env.COMMERCIAL_ENCRYPTION_KEY) cycleError ||= "COMMERCIAL_NOT_CONFIGURED";
+    try { await getDb().serviceHeartbeat.upsert({ where: { id: "mail-worker" }, create: { id: "mail-worker", lastSeenAt: new Date(), lastSuccessAt: cycleError ? null : new Date(), lastError: cycleError || (!process.env.COMMERCIAL_ENCRYPTION_KEY ? "COMMERCIAL_NOT_CONFIGURED" : null) }, update: { lastSeenAt: new Date(), ...(!cycleError ? { lastSuccessAt: new Date() } : {}), lastError: cycleError || (!process.env.COMMERCIAL_ENCRYPTION_KEY ? "COMMERCIAL_NOT_CONFIGURED" : null) } }); } catch { console.error("worker_heartbeat_unavailable"); }
     if (continuous && !stopping) await new Promise((resolve) => setTimeout(resolve, 5000));
   } while (continuous && !stopping);
 }

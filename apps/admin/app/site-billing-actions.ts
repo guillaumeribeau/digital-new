@@ -5,7 +5,7 @@ import { getDb } from "@nova/database";
 import { z } from "zod";
 import { AdminAccessError, authenticate } from "../lib/access";
 import { CommercialError } from "../lib/commercial-core";
-import { prepareRevisionEmail, sendRevisionEmail, prepareSiteSubscription, sendSiteSubscription, saveSitePresentation, sendSitePresentation, syncSiteSubscription } from "../lib/site-billing";
+import { resendCurrentSiteEmail, prepareRevisionEmail, sendRevisionEmail, prepareSiteSubscription, sendSiteSubscription, saveSitePresentation, sendSitePresentation, syncSiteSubscription } from "../lib/site-billing";
 export type SiteBillingResult = { error?: string; success?: string; id?: string; version?: number; html?: string; kind?: "creation" | "subscription" | "revisions" };
 export async function siteBillingAction(_previous: SiteBillingResult, form: FormData): Promise<SiteBillingResult> {
   try {
@@ -13,8 +13,9 @@ export async function siteBillingAction(_previous: SiteBillingResult, form: Form
     const op = form.get("operation");
     if (op === "preview") return { ...await saveSitePresentation(h, Object.fromEntries(form)), kind: "creation", success: "Brouillon enregistré. Vérifiez l’e-mail avant envoi." };
     const id = z.uuid().parse(form.get("id"));
-    if (op === "revisions-preview") return { ...await prepareRevisionEmail(h, id, String(form.get("message") || "")), kind: "revisions", success: "E-mail d’ajustements préparé. Vérifiez les questions avant envoi." };
-    if (op === "send") await sendSitePresentation(h, id, z.coerce.number().int().parse(form.get("version")));
+    if (op === "resend-current") await resendCurrentSiteEmail(h, id, z.uuid().parse(form.get("requestId")));
+    else if (op === "revisions-preview") return { ...await prepareRevisionEmail(h, id, String(form.get("message") || "")), kind: "revisions", success: "E-mail d’ajustements préparé. Vérifiez les questions avant envoi." };
+    else if (op === "send") await sendSitePresentation(h, id, z.coerce.number().int().parse(form.get("version")));
     else if (op === "revisions-send") await sendRevisionEmail(h, id, z.coerce.number().int().parse(form.get("version")));
     else if (op === "subscription-preview") {
       if (form.get("confirmed") !== "yes") return { error: "Confirmez que les ajustements sont validés et que le site est prêt à être publié." };
@@ -25,7 +26,7 @@ export async function siteBillingAction(_previous: SiteBillingResult, form: Form
       if (order.stripeSubscriptionId) await syncSiteSubscription(id, order.stripeSubscriptionId);
     } else return { error: "Action inconnue." };
     revalidatePath("/", "layout");
-    return { success: (op === "send" || op === "subscription-send" || op === "revisions-send") ? "E-mail ajouté à la file d’envoi." : "Suivi Stripe actualisé. Consultez l’état du paiement avant de publier." };
+    return { success: (op === "resend-current" || op === "send" || op === "subscription-send" || op === "revisions-send") ? "E-mail ajouté à la file d’envoi." : "Suivi Stripe actualisé. Consultez l’état du paiement avant de publier." };
   } catch (error) {
     if (error instanceof AdminAccessError) return { error: "Votre session a expiré ou ne permet pas cette action. Reconnectez-vous à l’administration." };
     if (error instanceof z.ZodError) {
@@ -41,6 +42,8 @@ export async function siteBillingAction(_previous: SiteBillingResult, form: Form
       PAYMENT_REQUIRED: "Le paiement de création et l’accord du client sont requis. Pour préparer l’e-mail d’abonnement, renseignez aussi l’URL définitive HTTPS du site.",
       REVISION_EMAIL_SENT: "L’e-mail d’ajustements a déjà été envoyé ou le projet est passé à l’abonnement. Rechargez la fiche pour consulter son suivi.",
       SUBSCRIPTION_INVITED: "L’invitation a déjà été envoyée ou l’abonnement est déjà démarré. Rechargez la fiche pour consulter son suivi.",
+      REMINDER_PENDING: "Un e-mail identique est déjà en attente. Consultez l’historique avant de le renvoyer.",
+      WORKFLOW_NOT_READY: "Le client doit valider la version actuelle, les séries de retours doivent être clôturées et le domaine choisi doit correspondre à l’URL définitive du projet.",
       FINAL_DOMAIN_REQUIRED: "Renseignez une adresse HTTPS valide pour le domaine définitif dans les liens du projet.",
       INVALID_ACTION: "Cette action ne peut pas être effectuée dans l’état actuel. Pour une capture, choisissez une image PNG, JPEG ou WebP moins volumineuse.",
     };

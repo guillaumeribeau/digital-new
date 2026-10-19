@@ -1,5 +1,5 @@
 "use client";
-import Link from "next/link";
+import Link from "@/components/ui/tracked-link";
 import { brand } from "@/config/brand.config";
 import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";

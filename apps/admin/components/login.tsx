@@ -11,7 +11,7 @@ export function Login() {
     try {
       const result = await authClient.signIn.email({ email: String(data.get("email")), password: String(data.get("password")), rememberMe: false });
       if (result.error) setError("Connexion refusée ou temporairement indisponible. Vérifiez vos identifiants.");
-      else navigateSession("/");
+      else navigateSession(result.data && "twoFactorRedirect" in result.data && result.data.twoFactorRedirect ? "/verification" : "/");
     } catch { setError("La connexion est temporairement indisponible."); }
     finally { setBusy(false); }
   }} className="login-form"><label htmlFor="email">Adresse e-mail</label><input id="email" name="email" type="email" autoComplete="username" required maxLength={254} placeholder="vous@entreprise.fr" />

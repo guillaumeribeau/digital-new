@@ -2,11 +2,11 @@
 import Link from "next/link";
 import { BrandLogo } from "./brand-logo";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Inbox, FolderKanban, Users, Globe2, CreditCard, Settings, LogOut, ArrowUpRight, MessagesSquare, FileText, Wallet } from "lucide-react";
+import { LayoutDashboard, Inbox, FolderKanban, Users, Globe2, CreditCard, Settings, LogOut, ArrowUpRight, MessagesSquare, FileText, Wallet, Send, BarChart3, Activity, ShieldCheck } from "lucide-react";
 import { authClient, navigateSession } from "../lib/auth-client";
 import { useState } from "react";
 const items = [["/", "Tableau de bord", LayoutDashboard], ["/demandes", "Demandes", Inbox], ["/projets", "Projets", FolderKanban],
-  ["/clients", "Clients", Users], ["/echanges", "Échanges", MessagesSquare], ["/devis", "Devis", FileText], ["/paiements", "Paiements", Wallet], ["/sites", "Sites internet", Globe2], ["/abonnements", "Abonnements", CreditCard], ["/parametres", "Paramètres", Settings]] as const;
+  ["/clients", "Clients", Users], ["/echanges", "Échanges", MessagesSquare], ["/devis", "Devis", FileText], ["/paiements", "Paiements", Wallet], ["/sites", "Sites internet", Globe2], ["/abonnements", "Abonnements", CreditCard], ["/emails", "E-mails", Send], ["/audience", "Audience et clics", BarChart3], ["/campagnes", "Campagnes", BarChart3], ["/sante", "État des services", Activity], ["/securite", "Sécurité", ShieldCheck], ["/parametres", "Paramètres", Settings]] as const;
 export function Nav({ name }: { name: string }) {
   const path = usePathname();
   const [error, setError] = useState("");

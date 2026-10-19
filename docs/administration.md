@@ -91,13 +91,13 @@ Le contrôle `npx tsx scripts/test-lead-pipeline.ts --trash-ui` utilise une base
 
 Chaque lecture et chaque mutation passe par le contrôle serveur ; le layout est un confort supplémentaire, pas la seule protection. Les actions sont validées avec Zod et les accès Prisma sont paramétrés. Les routes de création du site refusent les statuts privilégiés comme auparavant.
 
-Les endpoints Better Auth exposés sont limités à la connexion, la déconnexion et la lecture de session. L’inscription publique, la modification arbitraire de compte et les endpoints de double authentification ne sont pas exposés. Les POST exigent l’origine exacte et limitent le corps à 20 Ko, y compris sans Content-Length.
+Les endpoints Better Auth exposés sont limités à la connexion, la déconnexion, la lecture de session et la double authentification TOTP/codes de secours. L’inscription publique et la modification arbitraire de compte ne sont pas exposées. Les opérations de configuration MFA exigent aussi un administrateur actif. Les POST exigent l’origine exacte et limitent le corps à 20 Ko, y compris sans Content-Length.
 
 Un compteur PostgreSQL atomique limite 30 opérations d’authentification par adresse sur 15 minutes et cinq connexions par compte sur cette période. Les clés sont HMAC, les compteurs temporaires. Le compteur mémoire est désactivé. En cas de panne PostgreSQL, aucune connexion n’est annoncée.
 
 TRUSTED_CLIENT_IP_HEADER doit désigner uniquement un en-tête garanti comme entièrement remplacé par le proxy. Sans cette garantie, laisser vide : la quota global conservatrice s’applique. Aucune origine joker, aucun secret partagé avec le navigateur, aucun cache public de données administrateur.
 
-La durée de conservation des demandes, notes, historique et traces de connexion doit être fixée par le responsable avant production. L’administration n’ajoute aucune purge destructive. Les pièces jointes restent des références : aucun téléchargement public ni stockage de fichiers n’est ajouté.
+La durée de conservation des demandes, notes, historique et traces de connexion doit être fixée par le responsable avant production. L’administration n’ajoute aucune purge destructive. Les pièces jointes des retours privés sont chiffrées en PostgreSQL et leur téléchargement exige la session du bon client ou d’un administrateur. Les pièces jointes des échanges Resend conservent leur circuit existant. Aucun téléchargement public n’est ajouté.
 
 ## Vérifications
 
@@ -117,3 +117,35 @@ Les tests d’intégration créent une base PostgreSQL isolée sur loopback, app
 La connexion à votre Railway réel et la livraison Resend nécessitent vos services configurés. Elles ne sont pas validées par une base locale. Les contrôles effectués comprennent 19 tests unitaires, 7 tests du pipeline et 8 tests d’administration/PostgreSQL, les builds des deux applications, le lint/TypeScript et les parcours navigateur sur quatre largeurs. L’audit des dépendances de production ne signale pas de vulnérabilité ; cinq alertes restent dans l’outillage ESLint existant.
 
 Sources : [Better Auth / Next.js](https://better-auth.com/docs/integrations/next), [Better Auth / E-mail et mot de passe](https://better-auth.com/docs/authentication/email-password).
+
+
+## Double authentification
+
+Ouvrir Sécurité (`/securite`) après connexion. Saisir son mot de passe, scanner le QR local dans une application TOTP, sauvegarder les codes de secours et confirmer un code à six chiffres. Le QR n’est transmis à aucun service d’image externe. L’activation n’est effective qu’après cette vérification ; les anciens accès sans second facteur ne donnent alors plus accès à l’admin. Les codes de secours ne s’utilisent qu’une fois.
+
+Aux connexions suivantes, le mot de passe conduit à `/verification` ; aucune session utilisable n’est conservée avant le code TOTP ou de secours. Cinq échecs consécutifs de second facteur verrouillent le compte pendant quinze minutes, en plus des limites IP. L’option de confiance de l’appareil est refusée. La double authentification reste à activer individuellement depuis ce menu.
+
+En cas de perte du téléphone ET des codes de secours, un opérateur autorisé peut lancer `npm run admin:manage`, choisir `reset-mfa` et confirmer. Cette opération révoque toutes les sessions et challenges du compte et retire le second facteur ; l’administrateur doit ensuite le reconfigurer. Aucun endpoint public de récupération MFA n’est exposé. Les indicateurs historiques sans secret MFA sont normalisés par la migration pour éviter de bloquer un compte qui n’avait jamais réellement configuré son application.
+
+Les tests d’intégration couvrent l’activation vérifiée, le challenge après mot de passe, les codes de secours à usage unique et la révocation du compte. Voir `docs/relation-client.md` pour les nouveaux écrans de suivi, fichiers privés, campagnes et santé.
+
+
+## Audience Google Analytics dans l’admin
+
+La page `/audience` lit Google Analytics Data API pour la propriété Zelyweb `559264383`. Elle affiche visiteurs uniques mesurés sur la période, sessions, pages vues, évolution quotidienne, quinze premières sources et pages, ainsi que les événements de boutons/contact/formulaire déjà instrumentés. Les périodes sont 7, 30 ou 90 jours, jusqu’au jour courant dans Europe/Paris ; les chiffres du jour peuvent être incomplets. Les rapports sont limités aux hôtes `zelyweb.com` et `www.zelyweb.com`. Les sites clients et le localhost ne sont pas agrégés.
+
+La lecture exige un administrateur actif, même si un rapport est déjà en cache. Le serveur utilise la bibliothèque officielle `google-auth-library`, un scope OAuth `analytics.readonly` et un compte de service dédié. Le jeton n’est jamais envoyé au navigateur. Aucun changement de base n’est nécessaire pour ce branchement.
+
+Configuration dans Google Cloud puis Railway **service admin uniquement** :
+
+1. Sélectionner/créer un projet Google Cloud et activer **Google Analytics Data API** (`analyticsdata.googleapis.com`).
+2. Dans IAM et administration → Comptes de service, créer un compte dédié (par exemple `zelyweb-analytics`). Aucun rôle de gestion du projet Cloud n’est nécessaire pour lire la propriété Analytics.
+3. Copier l’adresse du compte de service. Dans Google Analytics → Administration → Gestion des accès à la propriété **559264383**, ajouter cette adresse avec le rôle **Lecteur**.
+4. Créer une clé JSON pour ce compte de service. Conserver ce fichier privé hors du dépôt. Dans Railway → admin → Variables, définir `GA4_PROPERTY_ID=559264383`, `GA4_SERVICE_ACCOUNT_EMAIL` avec le champ `client_email`, et `GA4_SERVICE_ACCOUNT_PRIVATE_KEY` avec le champ `private_key` du JSON. Les retours PEM réels et les séquences littérales `\n` sont pris en charge. Aucune variable `NEXT_PUBLIC_` pour ces identifiants.
+5. Redéployer l’admin, puis ouvrir Audience et clics. Ne transmettre ni le fichier JSON ni la clé privée dans la conversation. L’adresse du compte de service et le numéro de propriété peuvent être communiqués pour l’assistance.
+
+Sans identifiants, sans permission ou lors d’une panne Google, un message explicite remplace les rapports. Aucune valeur de démonstration n’est affichée. Un zéro est présenté uniquement après une réponse de rapports valide. Les données réussies sont mises en cache cinq minutes en mémoire par propriété, identifiants et période. Aucun rapport expiré n’est présenté comme une lecture fraîche ; plusieurs requêtes simultanées partagent la même lecture. Les seuils de confidentialité/échantillonnage indiqués par Google sont signalés.
+
+Les clics sont les événements déjà suivis (`cta_click`, `contact_click`, `lead_form_start`, `lead_form_step`, `lead_form_submit`, `lead_form_success`), pas tous les clics de la page. Les compteurs d’événements peuvent compter plusieurs actions par visiteur. Les visiteurs uniques de la période ne sont pas obtenus en additionnant les visiteurs quotidiens. Le consentement et les bloqueurs réduisent potentiellement l’audience mesurée ; la base des demandes reste une mesure distincte. Aucun nouveau traceur ni contournement du consentement n’est introduit.
+
+Références : [API Google Analytics](https://developers.google.com/analytics/devguides/reporting/data/v1/quickstart) et [dimensions/métriques](https://developers.google.com/analytics/devguides/reporting/data/v1/api-schema).

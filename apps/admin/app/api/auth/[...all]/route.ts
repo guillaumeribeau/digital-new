@@ -1,8 +1,9 @@
+import { authenticate, AdminAccessError } from "../../../../lib/access";
 import { getAuth } from "../../../../lib/auth";
 import { limitAuth } from "../../../../lib/rate-limit";
 
 export const runtime = "nodejs";
-const allowed = new Set(["sign-in/email", "sign-out", "get-session"]);
+const allowed = new Set(["sign-in/email", "sign-out", "get-session", "two-factor/enable", "two-factor/disable", "two-factor/verify-totp", "two-factor/verify-backup-code", "two-factor/generate-backup-codes"]);
 async function handle(request: Request) {
   const path = new URL(request.url).pathname.replace(/^\/api\/auth\//, "");
   if (!allowed.has(path)) return Response.json({ error: "Opération indisponible." }, { status: 404 });
@@ -31,6 +32,7 @@ async function handle(request: Request) {
       if (path === "sign-in/email" && data && typeof data === "object" && "email" in data &&
         typeof data.email === "string" && !(await limitAuth("account:" + data.email.trim().toLowerCase(), 5)))
         return Response.json({ error: "Trop de tentatives." }, { status: 429, headers: { "Retry-After": "900" } });
+      if (["two-factor/enable", "two-factor/disable", "two-factor/generate-backup-codes"].includes(path)) await authenticate(request.headers);
       const rebuilt = new Request(request.url, { method: request.method, headers: request.headers, body: bytes });
       const response = await getAuth().handler(rebuilt);
       response.headers.set("Cache-Control", "private, no-store");
@@ -38,6 +40,7 @@ async function handle(request: Request) {
     }
     return await getAuth().handler(request);
   } catch (error) {
+    if (error instanceof AdminAccessError) return Response.json({ error: "Connexion administrateur requise." }, { status: error.reason === "FORBIDDEN" ? 403 : 401 });
     if (error instanceof SyntaxError) return Response.json({ error: "Requête invalide." }, { status: 400 });
     console.error("admin_auth_unavailable");
     return Response.json({ error: "Connexion temporairement indisponible." }, { status: 503 });

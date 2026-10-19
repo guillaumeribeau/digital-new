@@ -66,7 +66,7 @@ async function main() {
     await portal.setViewportSize({ width: 1440, height: 1000 });
     await portal.screenshot({ path: "reports/billing/client-desktop.png", fullPage: true });
     // Simulated signed-payment outcome in this isolated database; no real Stripe call.
-    await db.siteOrder.update({ where: { id: order.id }, data: { status: "PAID", creationPaidAt: new Date(), stripeCustomerId: "cus_ui_fixture" } });
+    await db.siteOrder.update({ where: { id: order.id }, data: { workflowVersion: 0, status: "PAID", creationPaidAt: new Date(), stripeCustomerId: "cus_ui_fixture" } });
     await page.reload();
     await card.getByRole("button", { name: "Prévisualiser l’e-mail d’ajustements" }).click();
     const revisions = card.frameLocator('iframe[title="Aperçu de l’e-mail d’ajustements"]');

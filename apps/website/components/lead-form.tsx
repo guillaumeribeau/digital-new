@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/ui/tracked-link";
 import Image from "next/image";
 import { examples } from "@/lib/examples";
 import "@/styles/lead-form.css";

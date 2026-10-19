@@ -11,6 +11,8 @@ import { leadSchema } from "@nova/validation";
 import { decryptPayload } from "../../apps/website/lib/lead-security";
 import { limitAuth } from "../../apps/admin/lib/rate-limit";
 import { processOutbox } from "../../apps/website/lib/outbox";
+import { JWT } from "google-auth-library";
+import { getAudience } from "../../apps/admin/lib/audience";
 
 const db = getDb();
 const password = "Fictitious-Test-Password-42!";
@@ -38,6 +40,7 @@ test("aucune lecture ou mutation anonyme et inscription publique interdite", asy
   await assert.rejects(adminService.setLeadDeleted(new Headers(), {}), AdminAccessError);
   assert.equal((await call("sign-up/email", { email: "intrus@example.com", password })).status, 404);
   assert.equal((await call("update-user", { name: "Intrus" })).status, 404);
+  assert.equal((await call("two-factor/enable", { password, method: "totp" })).status, 401);
 });
 test("connexion par mot de passe avec acces immediat aux donnees", async () => {
   await db.lead.deleteMany();
@@ -51,9 +54,7 @@ test("connexion par mot de passe avec acces immediat aux donnees", async () => {
   await adminService.dashboard(authenticated());
   const session = await db.session.findFirstOrThrow({ where: { userId } });
   assert.equal(session.mfaVerifiedAt, null);
-  for (const path of ["two-factor/enable", "two-factor/verify-totp", "two-factor/verify-backup-code"]) {
-    assert.equal((await call(path, { password, code: "000000" })).status, 404);
-  }
+
 });
 test("formulaire → administration : vérification, qualification, notes et conversion concurrente", async () => {
   const { reference } = await leadRepository.submit(input());
@@ -78,6 +79,34 @@ test("formulaire → administration : vérification, qualification, notes et con
   assert.equal(lead?.project?.id, ids[0]);
   await assert.rejects(adminService.changeLeadStatus(authenticated(), { id: reference, expected: "IN_PROGRESS", status: "PAID" }), BusinessError);
 });
+
+test("audience GA4 : accès privé, autorisation manquante, rapports et cache", async () => {
+  await assert.rejects(getAudience(new Headers(), "7"), AdminAccessError);
+  assert.equal((await getAudience(authenticated(), "7")).state, "unconfigured");
+  const previousFetch = globalThis.fetch, previousToken = JWT.prototype.getAccessToken;
+  const before = { email: process.env.GA4_SERVICE_ACCOUNT_EMAIL, key: process.env.GA4_SERVICE_ACCOUNT_PRIVATE_KEY };
+  process.env.GA4_SERVICE_ACCOUNT_EMAIL = "fixture@fixture.iam.gserviceaccount.com"; process.env.GA4_SERVICE_ACCOUNT_PRIVATE_KEY = "-----BEGIN PRIVATE KEY-----fixture";
+  JWT.prototype.getAccessToken = async () => ({ token: "test-token" }); let calls = 0, status = 200;
+  globalThis.fetch = async (url, init) => {
+    calls++; assert.equal(String(url), "https://analyticsdata.googleapis.com/v1beta/properties/559264383:batchRunReports");
+    assert.equal(new Headers(init?.headers).get("Authorization"), "Bearer test-token");
+    const body = JSON.parse(String(init?.body)); assert.equal(body.requests.length, 5);
+    return status === 200 ? Response.json({ reports: [{ rows: [{ metricValues: [{ value: "9" }, { value: "15" }, { value: "40" }] }] }, {}, {}, {}, {}] }) : new Response("private error details", { status });
+  };
+  try {
+    const [one, two] = await Promise.all([getAudience(authenticated(), "7"), getAudience(authenticated(), "7")]);
+    assert.equal(one.state, "ready"); assert.equal(two.state, "ready"); assert.equal(calls, 1);
+    if (one.state === "ready") assert.equal(one.data.visitors, 9);
+    await getAudience(authenticated(), "7"); assert.equal(calls, 1);
+    await assert.rejects(getAudience(new Headers(), "7"), AdminAccessError);
+    status = 403; assert.equal((await getAudience(authenticated(), "30")).state, "denied");
+    status = 429; assert.equal((await getAudience(authenticated(), "90")).state, "unavailable");
+  } finally {
+    globalThis.fetch = previousFetch; JWT.prototype.getAccessToken = previousToken;
+    if (before.email === undefined) delete process.env.GA4_SERVICE_ACCOUNT_EMAIL; else process.env.GA4_SERVICE_ACCOUNT_EMAIL = before.email;
+    if (before.key === undefined) delete process.env.GA4_SERVICE_ACCOUNT_PRIVATE_KEY; else process.env.GA4_SERVICE_ACCOUNT_PRIVATE_KEY = before.key;
+  }
+});
 test("recherche, filtres, pagination et indicateurs PostgreSQL", async () => {
   const data = input("Autre Entreprise Fictive");
   await leadRepository.submit(data);
@@ -99,7 +128,7 @@ test("suivi de production, liens HTTPS, conflits et historique transactionnel", 
   const previousStripeKey = process.env.STRIPE_SECRET_KEY;
   process.env.STRIPE_SECRET_KEY = "sk_test_admin_fixture";
   // Production-flow fixture: publication requires confirmed creation and first monthly payment.
-  await db.siteOrder.create({ data: { projectId: project.id, previewUrl: "https://preview.example.com", screenshot: "fixture", message: "Fixture", mode: "TEST", tokenHash: randomUUID().replaceAll("-", "").padEnd(64, "0"), tokenEncrypted: "fixture", creationPaidAt: new Date(), firstSubscriptionPaidAt: new Date(), subscriptionStatus: "active" } });
+  await db.siteOrder.create({ data: { workflowVersion: 0, projectId: project.id, previewUrl: "https://preview.example.com", screenshot: "fixture", message: "Fixture", mode: "TEST", tokenHash: randomUUID().replaceAll("-", "").padEnd(64, "0"), tokenEncrypted: "fixture", creationPaidAt: new Date(), firstSubscriptionPaidAt: new Date(), subscriptionStatus: "active" } });
   for (const stage of ["CONTENT_PREPARATION", "CREATION", "REVIEW", "PREVIEW_READY", "PREVIEW_SENT", "AWAITING_APPROVAL", "APPROVED", "AWAITING_PAYMENT", "PAID", "PUBLISHING", "PUBLISHED"]) {
     project = await db.project.findUniqueOrThrow({ where: { id: project.id } });
     await adminService.changeProjectStage(authenticated(), { id: project.id, expected: project.stage, stage });
@@ -160,15 +189,31 @@ test("corbeille : les projets et échanges liés empêchent la suppression", asy
   assert.equal((await db.lead.findUniqueOrThrow({ where: { id: reference } })).deletedAt, null);
 });
 
-test("reconnexion sans challenge pour un ancien compte MFA et compte revoque", async () => {
+test("double authentification : activation vérifiée, challenge, secours unique et révocation", async () => {
+  const setup = await call("two-factor/enable", { password, method: "totp" });
+  assert.equal(setup.status, 200); const data = await setup.json();
+  assert.equal((await db.user.findUniqueOrThrow({ where: { id: userId } })).twoFactorEnabled, false);
+  const secret = new URL(data.totpURI).searchParams.get("secret")!;
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"; let bits = "";
+  for (const c of secret.toUpperCase().replace(/=/g, "")) bits += alphabet.indexOf(c).toString(2).padStart(5, "0");
+  const bytes = Buffer.from((bits.match(/.{8}/g) || []).map(b => parseInt(b, 2)));
+  const { createHmac } = await import("node:crypto");
+  const counter = Buffer.alloc(8); counter.writeBigUInt64BE(BigInt(Math.floor(Date.now() / 30000)));
+  const hash = createHmac("sha1", bytes).update(counter).digest(), offset = hash[hash.length - 1] & 15;
+  const code = ((hash.readUInt32BE(offset) & 0x7fffffff) % 1000000).toString().padStart(6, "0");
+  assert.equal((await call("two-factor/verify-totp", { code })).status, 200);
+  assert.equal((await db.user.findUniqueOrThrow({ where: { id: userId } })).twoFactorEnabled, true);
+  await authenticate(authenticated());
   assert.equal((await call("sign-out")).status, 200);
-  await assert.rejects(adminService.dashboard(authenticated()), AdminAccessError);
-  await db.user.update({ where: { id: userId }, data: { twoFactorEnabled: true } });
   const response = await call("sign-in/email", { email: "admin-test@example.com", password });
-  assert.equal(response.status, 200);
-  assert.notEqual((await response.json()).twoFactorRedirect, true);
-  await adminService.dashboard(authenticated());
-  assert.equal((await authenticate(authenticated())).id, adminId);
+  assert.equal(response.status, 200); assert.equal((await response.json()).twoFactorRedirect, true);
+  await assert.rejects(adminService.dashboard(authenticated()), AdminAccessError);
+  assert.notEqual((await call("two-factor/verify-totp", { code: "invalid" })).status, 200);
+  assert.equal((await call("two-factor/verify-backup-code", { code: data.backupCodes[0] })).status, 200);
+  await authenticate(authenticated());
+  await call("sign-out"); await call("sign-in/email", { email: "admin-test@example.com", password });
+  assert.notEqual((await call("two-factor/verify-backup-code", { code: data.backupCodes[0] })).status, 200);
+  assert.equal((await call("two-factor/verify-backup-code", { code: data.backupCodes[1] })).status, 200);
   await db.adminUser.update({ where: { id: adminId }, data: { active: false } });
   await assert.rejects(adminService.dashboard(authenticated()), (error: unknown) => error instanceof AdminAccessError && error.reason === "FORBIDDEN");
 });

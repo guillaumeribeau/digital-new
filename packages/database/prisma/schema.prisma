@@ -425,6 +425,16 @@ model PaymentAttempt {
 model SiteOrder {
   id                    String @id @default(uuid()) @db.Uuid
   projectId             String @unique @db.Uuid
+  workflowVersion       Int @default(1)
+  reviewVersion         Int @default(1)
+  reviewUrl             String? @db.VarChar(1000)
+  finalApprovedAt       DateTime? @db.Timestamptz(3)
+  finalApprovedVersion  Int?
+  finalApprovedName     String? @db.VarChar(200)
+  domainReadyAt         DateTime? @db.Timestamptz(3)
+  refundedCents         Int @default(0)
+  disputeStatus         String? @db.VarChar(50)
+  nextBillingAt         DateTime? @db.Timestamptz(3)
   version               Int @default(1)
   creationHtCents       Int @default(29900)
   monthlyHtCents        Int @default(2900)
@@ -468,6 +478,11 @@ model SiteOrder {
   updatedAt             DateTime @updatedAt @db.Timestamptz(3)
   project               Project @relation(fields: [projectId], references: [id], onDelete: Restrict)
   invoices              BillingInvoice[]
+  emails                CommercialEmail[]
+  domainOptions         DomainOption[]
+  domainSelection       DomainSelection?
+  reviewRounds          ReviewRound[]
+  financialEvents       FinancialEvent[]
 }
 
 model BillingInvoice {
@@ -489,6 +504,11 @@ model CommercialEmail {
   quoteId           String? @db.Uuid
   messageId         String? @db.Uuid
   kind              String @db.VarChar(40)
+  siteOrderId       String? @db.Uuid
+  deliveryStatus    String? @db.VarChar(30)
+  resendOfId        String? @db.Uuid
+  manualRequestId   String? @unique @db.Uuid
+  lastHttpStatus    Int?
   payloadEncrypted  String? @db.Text
   status            String @default("PENDING") @db.VarChar(30)
   createdAt         DateTime @default(now()) @db.Timestamptz(3)
@@ -500,9 +520,11 @@ model CommercialEmail {
   providerMessageId String? @unique @db.VarChar(200)
   sentAt            DateTime? @db.Timestamptz(3)
   lastError         String? @db.VarChar(100)
+  siteOrder         SiteOrder? @relation(fields: [siteOrderId], references: [id], onDelete: Restrict)
   quote             Quote? @relation(fields: [quoteId], references: [id], onDelete: Restrict)
   message           ClientMessage? @relation(fields: [messageId], references: [id], onDelete: Restrict)
   @@index([status, availableAt])
+  @@index([siteOrderId, createdAt])
 }
 
 model CommercialWebhook {
@@ -529,4 +551,95 @@ model MessageTemplate {
   subject String @db.VarChar(300)
   content String @db.Text
   active  Boolean @default(true)
+}
+
+
+model DomainOption {
+  id                 String @id @default(uuid()) @db.Uuid
+  siteOrderId        String @db.Uuid
+  domain             String @db.VarChar(253)
+  initialHtCents     Int
+  renewalHtCents     Int
+  recommended        Boolean @default(false)
+  active             Boolean @default(true)
+  checkedAt          DateTime @default(now()) @db.Timestamptz(3)
+  createdAt          DateTime @default(now()) @db.Timestamptz(3)
+  order              SiteOrder @relation(fields: [siteOrderId], references: [id], onDelete: Restrict)
+  selections         DomainSelection[]
+  @@index([siteOrderId, active])
+}
+
+model DomainSelection {
+  id                 String @id @default(uuid()) @db.Uuid
+  siteOrderId        String @unique @db.Uuid
+  optionId           String? @db.Uuid
+  domain             String @db.VarChar(253)
+  kind               String @db.VarChar(20)
+  status             String @db.VarChar(20)
+  acceptedSnapshot   Json
+  selectedAt         DateTime @default(now()) @db.Timestamptz(3)
+  purchasedAt        DateTime? @db.Timestamptz(3)
+  renewalAt          DateTime? @db.Timestamptz(3)
+  supplementQuoteId  String? @db.Uuid
+  order              SiteOrder @relation(fields: [siteOrderId], references: [id], onDelete: Restrict)
+  option             DomainOption? @relation(fields: [optionId], references: [id], onDelete: Restrict)
+}
+
+model ReviewRound {
+  id          String @id @default(uuid()) @db.Uuid
+  siteOrderId String @db.Uuid
+  number      Int
+  status      String @default("OPEN") @db.VarChar(20)
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  closedAt    DateTime? @db.Timestamptz(3)
+  order       SiteOrder @relation(fields: [siteOrderId], references: [id], onDelete: Restrict)
+  messages    ReviewMessage[]
+  @@unique([siteOrderId, number])
+}
+
+model ReviewMessage {
+  id          String @id @default(uuid()) @db.Uuid
+  requestId   String @unique @db.Uuid
+  roundId     String @db.Uuid
+  author      String @db.VarChar(20)
+  content     String @db.VarChar(10000)
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  round       ReviewRound @relation(fields: [roundId], references: [id], onDelete: Restrict)
+  files       ReviewFile[]
+  @@index([roundId, createdAt])
+}
+
+model ReviewFile {
+  id          String @id @default(uuid()) @db.Uuid
+  messageId   String @db.Uuid
+  filename    String @db.VarChar(200)
+  mimeType    String @db.VarChar(50)
+  sizeBytes   Int
+  encrypted   String @db.Text
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  message     ReviewMessage @relation(fields: [messageId], references: [id], onDelete: Restrict)
+}
+
+model FinancialEvent {
+  id            String @id @db.VarChar(200)
+  siteOrderId   String? @db.Uuid
+  quoteId       String? @db.Uuid
+  purpose String @default("UNKNOWN") @db.VarChar(30)
+  kind          String @db.VarChar(20)
+  status        String @db.VarChar(50)
+  amountCents   Int
+  currency      String @db.VarChar(3)
+  chargeId      String @db.VarChar(200)
+  createdAt     DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime @updatedAt @db.Timestamptz(3)
+  order         SiteOrder? @relation(fields: [siteOrderId], references: [id], onDelete: Restrict)
+  @@index([siteOrderId, createdAt])
+  @@index([quoteId, createdAt])
+}
+
+model ServiceHeartbeat {
+  id            String @id @db.VarChar(50)
+  lastSeenAt    DateTime @default(now()) @db.Timestamptz(3)
+  lastSuccessAt DateTime? @db.Timestamptz(3)
+  lastError     String? @db.VarChar(100)
 }

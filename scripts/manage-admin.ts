@@ -11,10 +11,10 @@ async function main() {
   loadEnvConfig(resolve("apps/admin"), undefined, undefined, true);
   if (operatorUrl || process.env.DIRECT_URL) process.env.DATABASE_URL = operatorUrl || process.env.DIRECT_URL;
   const terminal = createInterface({ input: process.stdin, output: process.stdout });
-  let email: string, operation: "desactiver" | "reactiver" | "mot-de-passe";
+  let email: string, operation: "desactiver" | "reactiver" | "mot-de-passe" | "reset-mfa";
   try {
     email = z.email().parse((await terminal.question("Adresse du compte concerné : ")).trim().toLowerCase());
-    operation = z.enum(["desactiver", "reactiver", "mot-de-passe"]).parse(await terminal.question("Action (desactiver / reactiver / mot-de-passe) : "));
+    operation = z.enum(["desactiver", "reactiver", "mot-de-passe", "reset-mfa"]).parse(await terminal.question("Action (desactiver / reactiver / mot-de-passe / reset-mfa) : "));
     if (await terminal.question("Confirmez l’action en saisissant CONFIRMER : ") !== "CONFIRMER") throw new Error("CANCELLED");
   } finally { terminal.close(); }
   let password: string | undefined;
@@ -28,6 +28,11 @@ async function main() {
     if (!user.admin) throw new Error("NOT_ADMIN");
     await tx.session.deleteMany({ where: { userId: user.id } });
     if (operation === "desactiver" || operation === "reactiver") await tx.adminUser.update({ where: { id: user.admin.id }, data: { active: operation === "reactiver" } });
+    if (operation === "reset-mfa") {
+      await tx.twoFactor.deleteMany({ where: { userId: user.id } });
+      await tx.user.update({ where: { id: user.id }, data: { twoFactorEnabled: false } });
+      await tx.verification.deleteMany({ where: { value: user.id } });
+    }
     if (password) await tx.account.updateMany({ where: { userId: user.id, providerId: "credential" }, data: { password } });
 
   });

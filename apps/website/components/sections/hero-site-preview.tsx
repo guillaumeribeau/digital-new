@@ -1,5 +1,5 @@
 import Image from "next/image";
-import Link from "next/link";
+import Link from "@/components/ui/tracked-link";
 import { ArrowUpRight, Flower2, Leaf, Sprout, Trees } from "lucide-react";
 export function HeroSitePreview() {
   return (

@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/tracked-link";
 import { ConsentSettings } from "./consent";
 import { ContactLink } from "./ui/contact-link";
 import { Logo } from "./ui/logo";

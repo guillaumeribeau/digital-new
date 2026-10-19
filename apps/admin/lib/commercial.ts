@@ -8,7 +8,7 @@ import { quotePdf } from "./quote-pdf";
 
 export const settingsInput = z.object({ legalName: z.string().trim().max(200), address: z.string().trim().max(1000),
   registrationNumber: z.string().trim().max(100), vatNumber: z.string().trim().max(100), taxNote: z.string().trim().max(1000),
-  terms: z.string().trim().max(10000), validityDays: z.coerce.number().int().min(1).max(180), reminderDays: z.coerce.number().int().min(0).max(30) });
+  terms: z.string().trim().max(10000), validityDays: z.coerce.number().int().min(1).max(180), reminderDays: z.coerce.number().int().transform(() => 0) });
 const queueData = (payload: CommercialEmailPayload, kind: string, relation: { messageId?: string; quoteId?: string }) => ({
   id: randomUUID(), ...relation, kind, payloadEncrypted: seal(payload), expiresAt: new Date(Date.now() + 23 * 3600000),
 });

@@ -210,6 +210,8 @@ test("catalogue, relances sans doublon, paramètres figés et permissions Postgr
   }
   await assert.rejects(db.$transaction(async (tx) => { await tx.$executeRawUnsafe('SET LOCAL ROLE commercial_test_worker'); await tx.$queryRawUnsafe('SELECT * FROM auth_user'); }));
   await assert.rejects(db.$transaction(async (tx) => { await tx.$executeRawUnsafe('SET LOCAL ROLE commercial_test_worker'); await tx.$executeRaw`UPDATE "Quote" SET "title" = 'Intrusion' WHERE "id" = ${id}::uuid`; }));
+  await db.$transaction(async tx => { await tx.$executeRawUnsafe('SET LOCAL ROLE commercial_test_worker'); await tx.serviceHeartbeat.upsert({ where: { id: "mail-worker" }, create: { id: "mail-worker", lastSuccessAt: new Date() }, update: { lastSeenAt: new Date() } }); });
+  await assert.rejects(db.$transaction(async tx => { await tx.$executeRawUnsafe('SET LOCAL ROLE commercial_test_worker'); await tx.reviewFile.findMany(); }));
   assert.equal(commercialLocal(), true);
 });
 test("les opérations commerciales fonctionnent avec le rôle PostgreSQL restreint de l’administration", async () => {

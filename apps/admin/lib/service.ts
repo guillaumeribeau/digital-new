@@ -1,3 +1,4 @@
+import { requireWorkflowReady } from "./project-workflow";
 import { getDb, Prisma } from "@nova/database";
 import { leadTransitions, leadStatusForStage, nextProjectStages, type LeadStatusCode, type ProjectStageCode } from "@nova/shared";
 import { z } from "zod";
@@ -153,6 +154,7 @@ export const adminService = {
         if (["PAID", "PUBLISHING", "PUBLISHED"].includes(data.stage)) {
           const billing = await tx.siteOrder.findUnique({ where: { projectId: project.id } });
           if (!billing?.creationPaidAt || !["TEST", "LIVE"].includes(paymentMode()) || billing.mode !== paymentMode()) throw new BusinessError("CREATION_PAYMENT_REQUIRED");
+          if (["PUBLISHING", "PUBLISHED"].includes(data.stage)) await requireWorkflowReady(tx, billing, true);
           if (["PUBLISHING", "PUBLISHED"].includes(data.stage) && (!billing.firstSubscriptionPaidAt || billing.subscriptionStatus !== "active" || billing.billingAlert)) throw new BusinessError("SUBSCRIPTION_PAYMENT_REQUIRED");
         }
       if (["PREVIEW_SENT", "AWAITING_APPROVAL"].includes(data.stage) && !project.previewUrl) throw new BusinessError("PREVIEW_URL_REQUIRED");

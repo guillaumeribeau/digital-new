@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/tracked-link";
 import { DemoMotion } from "@/components/examples/demo-motion";
 import { Cormorant_Garamond, Manrope } from "next/font/google";
 import "@/styles/examples.css";

@@ -16,6 +16,7 @@ export async function authenticate(requestHeaders: Headers) {
   if (!admin || !admin.active || admin.role !== "ADMIN") throw new AdminAccessError("FORBIDDEN");
   const persisted = await db.session.findUnique({ where: { id: session.session.id } });
   if (!persisted || persisted.expiresAt <= new Date()) throw new AdminAccessError("UNAUTHENTICATED");
+  if (admin.user.twoFactorEnabled && !persisted.mfaVerifiedAt) throw new AdminAccessError("UNAUTHENTICATED");
   return admin;
 }
 export async function requireAdmin() {

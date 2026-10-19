@@ -1,3 +1,4 @@
+import { AttributionProvider } from "@/components/ui/tracked-link";
 import type { Metadata } from "next";
 import { Space_Grotesk, Inter } from "next/font/google";
 import { brand } from "@/config/brand.config";
@@ -55,7 +56,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <a className="skip-link" href="#main">
           Aller au contenu
         </a>
-        {children}
+        <AttributionProvider>{children}</AttributionProvider>
       </body>
     </html>
   );

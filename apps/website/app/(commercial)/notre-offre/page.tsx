@@ -1,5 +1,5 @@
 import { brand } from "@/config/brand.config";
-import Link from "next/link";
+import Link from "@/components/ui/tracked-link";
 import Image from "next/image";
 import "@/styles/offer-onepage.css";
 import { ArrowUpRight, Check, Plus, X } from "lucide-react";

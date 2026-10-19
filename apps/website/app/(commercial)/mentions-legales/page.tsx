@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/tracked-link";
 import { PageIntro } from "@/components/ui/page-intro";
 import { brand } from "@/config/brand.config";
 import { business } from "@nova/shared/business";

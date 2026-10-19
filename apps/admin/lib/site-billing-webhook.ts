@@ -1,3 +1,5 @@
+import { applyFinancialEvent } from "./financial-events";
+import { financialStage } from "./operations";
 import Stripe from "stripe";
 import { getDb } from "@nova/database";
 import { z } from "zod";
@@ -11,6 +13,7 @@ export async function applySiteBillingEvent(event: Stripe.Event) {
   if (mode !== paymentMode()) throw new CommercialError("INVALID_ACTION");
   const key = "site-stripe/" + event.id;
   if (await getDb().commercialWebhook.findUnique({ where: { key } })) return;
+  await applyFinancialEvent(event);
   const stripe = stripeClient();
   if (event.type === "checkout.session.completed" || event.type === "checkout.session.async_payment_succeeded") {
     const session = event.data.object as Stripe.Checkout.Session;
@@ -29,6 +32,7 @@ export async function applySiteBillingEvent(event: Stripe.Event) {
       if (!method || intent?.status !== "succeeded") throw new CommercialError("INVALID_ACTION");
       await getDb().$transaction(async tx => {
         await tx.$queryRaw`SELECT "id" FROM "SiteOrder" WHERE "id" = ${current.id}::uuid FOR UPDATE`;
+        await financialStage(tx, current.projectId, "PAID");
         await tx.siteOrder.update({ where: { id: current.id }, data: { status: "PAID", creationPaidAt: current.creationPaidAt || new Date(), paymentMethodId: method, stripeSessionId: session.id } });
       });
       await queueSiteNotice(current.id, "CREATION_PAID", "Votre commande Zelyweb est confirmée", "Le paiement de la création est confirmé. Vous recevrez un prochain e-mail avec quelques questions pour préparer vos ajustements. Vous pourrez y répondre directement avec vos modifications. Trois séries de retours regroupés sont incluses dans les 30 jours suivant ce paiement : textes, photos, couleurs et présentation. Après validation des ajustements, vous recevrez un e-mail pour activer votre abonnement. La mise en ligne aura lieu sous 2 jours ouvrés après confirmation de son premier paiement, si le domaine est prêt.");

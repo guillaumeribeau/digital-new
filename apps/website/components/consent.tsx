@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/ui/tracked-link";
 import { usePathname } from "next/navigation";
 import { analyticsEnabled, analyticsLocation, hasAnalyticsConsent, isMeasuredPage, measurementId } from "@/lib/analytics";
 let lastPage: string | undefined;

@@ -23,8 +23,7 @@ export async function queueQuoteReminder(id: string, manual = false) {
     const token = unseal(access.tokenEncrypted); if (typeof token !== "string") throw new CommercialError("INVALID_ACTION");
     await tx.commercialEmail.create({ data: { quoteId: id, kind: "REMINDER", expiresAt: new Date(Date.now() + 23 * 3600000), payloadEncrypted: seal({ from: sender(), to: [snapshot.buyer.email], reply_to: replyAddress(conversation.replyToken),
       subject: `Rappel · devis ${quote.number}`, text: `Bonjour ${snapshot.buyer.name},\n\nVotre devis ${quote.number} ${current.status === "ACCEPTED" ? "est accepté et attend son règlement" : "attend votre réponse"}.\n\nConsulter, accepter et payer :\n${publicOrigin()}/client/devis/${id}#token=${token}\n\nVous pouvez répondre à cet e-mail pour toute question.\n\n${snapshot.seller.legalName}`, attachments: [{ filename: `${quote.number}.pdf`, content: pdf.toString("base64") }] }) } });
-    const settings = await tx.commercialSettings.findUniqueOrThrow({ where: { id: "main" } });
-    await tx.quote.update({ where: { id }, data: { reminderCount: { increment: 1 }, nextReminderAt: settings.reminderDays && current.reminderCount < 1 && current.status === "SENT" ? new Date(Date.now() + settings.reminderDays * 86400000) : null } });
+    await tx.quote.update({ where: { id }, data: { reminderCount: { increment: 1 }, nextReminderAt: null } });
   });
 }
 export async function processCommercialOutbox(limit = 20) {
@@ -32,10 +31,8 @@ export async function processCommercialOutbox(limit = 20) {
   if (!commercialLocal() && !process.env.RESEND_API_KEY) throw new CommercialError("CONFIGURATION_REQUIRED");
   const db = getDb();
   await db.quote.updateMany({ where: { status: "SENT", validUntil: { lte: new Date() } }, data: { status: "EXPIRED", nextReminderAt: null } });
-  const due = await db.quote.findMany({ where: { status: "SENT", nextReminderAt: { lte: new Date() }, validUntil: { gt: new Date() }, reminderCount: { lt: 2 } }, select: { id: true }, take: 10 });
-  for (const quote of due) await queueQuoteReminder(quote.id);
   if (commercialLocal()) return { sent: 0, failed: 0 };
-  await db.commercialEmail.updateMany({ where: { status: { in: ["PENDING", "PROCESSING"] }, expiresAt: { lte: new Date() } }, data: { status: "DEAD", payloadEncrypted: null, lockId: null, lockedUntil: null, lastError: "DELIVERY_WINDOW_EXPIRED" } });
+  await db.commercialEmail.updateMany({ where: { status: { in: ["PENDING", "PROCESSING"] }, expiresAt: { lte: new Date() } }, data: { status: "DEAD", lockId: null, lockedUntil: null, lastError: "DELIVERY_WINDOW_EXPIRED" } });
   let sent = 0, failed = 0;
   for (let i = 0; i < limit; i++) {
     const lockId = randomUUID(), now = new Date(), lockedUntil = new Date(Date.now() + 120000);
@@ -43,30 +40,36 @@ export async function processCommercialOutbox(limit = 20) {
     const event = rows[0]; if (!event) break;
     try {
       if (!event.payloadEncrypted) throw new Error("EMPTY_EVENT");
-      if (event.quoteId) {
+      if (event.siteOrderId && event.kind !== "SITE_OWNER_NOTICE") {
+        const o = await db.siteOrder.findUniqueOrThrow({ where: { id: event.siteOrderId }, include: { project: { select: { stage: true, lead: { select: { deletedAt: true } } } } } });
+        if (o.project.lead.deletedAt || o.project.stage === "CANCELLED" || event.kind === "SITE_PRESENTATION" && o.creationPaidAt || event.kind === "SITE_SUBSCRIPTION_INVITE" && o.firstSubscriptionPaidAt) { await db.commercialEmail.updateMany({ where: { id: event.id, lockId }, data: { status: "CANCELLED", lockId: null, lockedUntil: null } }); continue; }
+      }
+      if (event.quoteId && event.kind !== "SITE_OWNER_NOTICE") {
         const quote = await db.quote.findUniqueOrThrow({ where: { id: event.quoteId } });
         if (["CANCELLED", "SUPERSEDED", "EXPIRED", "DECLINED"].includes(quote.status) || (event.kind === "REMINDER" && ["PAID", "COMPLETED"].includes(quote.status))) {
-          await db.commercialEmail.update({ where: { id: event.id }, data: { status: "CANCELLED", payloadEncrypted: null, lockId: null, lockedUntil: null } }); continue;
+          await db.commercialEmail.update({ where: { id: event.id }, data: { status: "CANCELLED", lockId: null, lockedUntil: null } }); continue;
         }
       }
       const payload = emailSchema.parse(unseal(event.payloadEncrypted));
       const response = await fetch("https://api.resend.com/emails", { method: "POST", headers: { Authorization: "Bearer " + process.env.RESEND_API_KEY, "Content-Type": "application/json", "Idempotency-Key": "nova-commercial/" + event.id }, body: JSON.stringify(payload), signal: AbortSignal.timeout(15000), cache: "no-store" });
-      if (!response.ok) throw new Error("DELIVERY_FAILED");
+      if (!response.ok) { await db.commercialEmail.updateMany({ where: { id: event.id, lockId }, data: { lastHttpStatus: response.status } }); throw new Error(response.status === 401 ? "RESEND_AUTH_INVALID" : response.status === 403 ? "RESEND_FORBIDDEN" : response.status === 429 ? "RESEND_RATE_LIMITED" : response.status === 422 ? "RESEND_PAYLOAD_REJECTED" : "RESEND_UNAVAILABLE"); }
       const result = await response.json() as { id?: string };
       if (typeof result.id !== "string" || !result.id || result.id.length > 200) throw new Error("DELIVERY_FAILED");
       await db.$transaction(async (tx) => {
-        await tx.commercialEmail.updateMany({ where: { id: event.id, lockId, status: "PROCESSING" }, data: { status: "SENT", sentAt: new Date(), providerMessageId: result.id, payloadEncrypted: null, lockId: null, lockedUntil: null, lastError: null } });
+        await tx.commercialEmail.updateMany({ where: { id: event.id, lockId, status: "PROCESSING" }, data: { status: "SENT", sentAt: new Date(), providerMessageId: result.id, lockId: null, lockedUntil: null, lastError: null, lastHttpStatus: null } });
         const receipts = await tx.commercialWebhook.findMany({ where: { emailId: result.id, deliveryStatus: { not: null } }, orderBy: { createdAt: "desc" }, take: 20 });
         const status = receipts.find((receipt) => ["BOUNCED", "COMPLAINED", "DEAD"].includes(receipt.deliveryStatus!))?.deliveryStatus || receipts[0]?.deliveryStatus || "SENT";
+        await tx.commercialEmail.updateMany({ where: { id: event.id, lockId: null }, data: { deliveryStatus: status } });
         if (event.messageId) await tx.clientMessage.updateMany({ where: { id: event.messageId, deliveryStatus: "QUEUED" }, data: { deliveryStatus: status, providerId: result.id } });
       }); sent++;
-    } catch {
+    } catch (error) {
+      const reason = error instanceof Error && ["RESEND_AUTH_INVALID", "RESEND_FORBIDDEN", "RESEND_RATE_LIMITED", "RESEND_PAYLOAD_REJECTED", "RESEND_UNAVAILABLE"].includes(error.message) ? error.message : "DELIVERY_FAILED";
       const dead = event.attempts >= 8;
-      await db.commercialEmail.updateMany({ where: { id: event.id, lockId, status: "PROCESSING" }, data: { status: dead ? "DEAD" : "PENDING", lockId: null, lockedUntil: null, lastError: "DELIVERY_FAILED", ...(dead ? { payloadEncrypted: null } : {}), availableAt: new Date(Date.now() + Math.min(3600000, 30000 * 2 ** (event.attempts - 1))) } });
+      await db.commercialEmail.updateMany({ where: { id: event.id, lockId, status: "PROCESSING" }, data: { status: dead ? "DEAD" : "PENDING", lockId: null, lockedUntil: null, lastError: reason, availableAt: new Date(Date.now() + Math.min(3600000, 30000 * 2 ** (event.attempts - 1))) } });
       if (dead && event.messageId) await db.clientMessage.updateMany({ where: { id: event.messageId, deliveryStatus: "QUEUED" }, data: { deliveryStatus: "DEAD" } });
       failed++;
     }
   }
-  await db.commercialEmail.updateMany({ where: { status: "PROCESSING", attempts: { gte: 8 }, lockedUntil: { lte: new Date() } }, data: { status: "DEAD", payloadEncrypted: null, lockId: null, lockedUntil: null, lastError: "ATTEMPTS_EXHAUSTED" } });
+  await db.commercialEmail.updateMany({ where: { status: "PROCESSING", attempts: { gte: 8 }, lockedUntil: { lte: new Date() } }, data: { status: "DEAD", lockId: null, lockedUntil: null, lastError: "ATTEMPTS_EXHAUSTED" } });
   return { sent, failed };
 }

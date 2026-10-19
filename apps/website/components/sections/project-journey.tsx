@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
-import Link from "next/link";
+import Link from "@/components/ui/tracked-link";
 import { ArrowUpRight, Check, Globe, MessageSquare, MousePointer2, Send, Sparkles } from "lucide-react";
 import { brand } from "@/config/brand.config";
 import "@/styles/project-journey.css";

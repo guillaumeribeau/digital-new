@@ -1,3 +1,6 @@
+import { adminWorkflow, clientWorkflow, workflowData, checkUpload, requireWorkflowReady } from "../../apps/admin/lib/project-workflow";
+import { resendEmail } from "../../apps/admin/lib/operations";
+import { GET as downloadReview } from "../../apps/admin/app/api/review-files/[id]/route";
 import { after, test } from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
@@ -128,9 +131,10 @@ test("checkout serveur sans doublon, facture et carte enregistrée seulement sur
   assert.equal((await stripeEvent("checkout.session.completed", { ...session, amount_total: 1 })).status, 503);
   const eventId = "evt_" + randomUUID(); assert.equal((await stripeEvent("checkout.session.completed", session, eventId)).status, 200); assert.equal((await stripeEvent("checkout.session.completed", session, eventId)).status, 200);
   const paid = await db.siteOrder.findUniqueOrThrow({ where: { id: orderId } }); assert.ok(paid.creationPaidAt); assert.ok(paid.consentText?.includes("420,00")); assert.equal(paid.paymentMethodId, "pm_site_fixture");
+  const syncedProject = await db.project.findUniqueOrThrow({ where: { id: projectId }, include: { lead: true } }); assert.equal(syncedProject.stage, "PAID"); assert.equal(syncedProject.lead.status, "PAID");
   assert.equal(await db.commercialWebhook.count({ where: { key: "site-notice/" + orderId + "/CREATION_PAID" } }), 1);
   assert.equal(await db.commercialWebhook.count({ where: { key: "site-owner/" + orderId + "/CREATION_PAID" } }), 1);
-  const owner = unseal((await db.commercialEmail.findFirstOrThrow({ where: { kind: "SITE_OWNER_NOTICE", payloadEncrypted: { not: null } } })).payloadEncrypted!) as { to: string[]; subject: string; html: string };
+  const owner = unseal((await db.commercialEmail.findFirstOrThrow({ where: { siteOrderId: orderId, kind: "SITE_OWNER_NOTICE", payloadEncrypted: { not: null } } })).payloadEncrypted!) as { to: string[]; subject: string; html: string };
   assert.deepEqual(owner.to, ["contact@zelyweb.com"]); assert.ok(owner.subject.startsWith("[TEST]")); assert.ok(!owner.html.includes(token));
 });
 
@@ -149,6 +153,35 @@ test("premier mois refusé bloque la publication ; régularisation, factures, re
   await adminService.projectLinks(h(), { id: projectId, expectedUpdatedAt: project.updatedAt.toISOString(), previewUrl: "https://preview.example.com", websiteUrl: "https://site.example.com" });
   await db.project.update({ where: { id: projectId }, data: { stage: "PAID" } });
   await assert.rejects(checkoutSiteSubscription(orderId, { agreement: true, version: 0 }), CommercialError);
+  await assert.rejects(prepareSiteSubscription(h(), orderId), CommercialError);
+  await adminWorkflow(h(), orderId, { action: "options", options: [{ domain: "site.example.com", initialHtCents: 2500, renewalHtCents: 3000, recommended: true }] });
+  const domain = (await workflowData(orderId)).domainOptions[0];
+  await clientWorkflow(orderId, { action: "domain", kind: "OPTION", optionId: domain.id, agreement: true });
+  const requestId = randomUUID();
+  await Promise.all([clientWorkflow(orderId, { action: "feedback", requestId, message: "Modifier le texte accueil" }, [checkUpload("photo.pdf", Buffer.from("%PDF-1.7\nfixture"))]), clientWorkflow(orderId, { action: "feedback", requestId, message: "Modifier le texte accueil" }, [checkUpload("photo.pdf", Buffer.from("%PDF-1.7\nfixture"))])]);
+  let workflow = await workflowData(orderId); assert.equal(workflow.reviewRounds.length, 1); assert.equal(workflow.reviewRounds[0].messages.length, 1);
+  await assert.rejects(clientWorkflow(orderId, { action: "approve", name: "Client Fictif", version: 1, agreement: true }), CommercialError);
+  await adminWorkflow(h(), orderId, { action: "close", roundId: workflow.reviewRounds[0].id });
+  const originalPaidAt = (await db.siteOrder.findUniqueOrThrow({ where: { id: orderId } })).creationPaidAt;
+  await db.siteOrder.update({ where: { id: orderId }, data: { creationPaidAt: new Date(Date.now() - 31 * 86400000) } });
+  await assert.rejects(clientWorkflow(orderId, { action: "feedback", requestId: randomUUID(), message: "Hors délai" }), CommercialError);
+  await db.siteOrder.update({ where: { id: orderId }, data: { creationPaidAt: originalPaidAt } });
+  for (let n = 2; n <= 3; n++) { await clientWorkflow(orderId, { action: "feedback", requestId: randomUUID(), message: "Série suivante " + n }); const open = (await workflowData(orderId)).reviewRounds.find(r => r.status === "OPEN")!; await adminWorkflow(h(), orderId, { action: "close", roundId: open.id }); }
+  await assert.rejects(clientWorkflow(orderId, { action: "feedback", requestId: randomUUID(), message: "Quatrième série refusée" }), CommercialError);
+  await clientWorkflow(orderId, { action: "approve", name: "Client Fictif", version: 1, agreement: true });
+  await adminWorkflow(h(), orderId, { action: "version", url: "https://preview.example.com/v2" });
+  await assert.rejects(prepareSiteSubscription(h(), orderId), CommercialError);
+  await assert.rejects(clientWorkflow(orderId, { action: "approve", name: "Client Fictif", version: 1, agreement: true }), CommercialError);
+  await clientWorkflow(orderId, { action: "approve", name: "Client Fictif", version: 2, agreement: true });
+  await clientWorkflow(orderId, { action: "feedback", requestId, message: "Modifier le texte accueil" });
+  workflow = await workflowData(orderId); assert.equal(workflow.reviewVersion, 2); assert.ok(workflow.finalApprovedAt, "Un ancien retour rejoué ne doit pas annuler un nouvel accord");
+  await assert.rejects(db.$transaction(async tx => requireWorkflowReady(tx, await tx.siteOrder.findUniqueOrThrow({ where: { id: orderId } }), true)), CommercialError);
+  await assert.rejects(adminWorkflow(h(), orderId, { action: "domain-ready" }), CommercialError);
+  const paidDomainQuote = await db.quote.create({ data: { leadId: project.leadId, number: "DOM-" + randomUUID(), title: "Supplément domaine", snapshot: { fixture: true }, documentHash: "f".repeat(64), acceptanceHash: "f".repeat(64), acceptedName: "Client Fictif", acceptedAt: new Date(), status: "PAID", paymentMode: "LOCAL", paidAt: new Date(), items: [], subtotalCents: 500, taxCents: 100, totalCents: 600, billingAddress: "Adresse fictive", deliveryTime: "2 jours", terms: "Fixture", validUntil: new Date(Date.now() + 86400000) } });
+  await assert.rejects(adminWorkflow(h(), orderId, { action: "domain-ready", quoteId: paidDomainQuote.id }), CommercialError);
+  await db.quote.update({ where: { id: paidDomainQuote.id }, data: { paymentMode: "TEST" } });
+  await adminWorkflow(h(), orderId, { action: "domain-ready", quoteId: paidDomainQuote.id, renewalAt: "2027-10-19" });
+  assert.equal((workflow.domainSelection!.acceptedSnapshot as { renewalSupplementHtCents: number }).renewalSupplementHtCents, 1000);
   const invite = await prepareSiteSubscription(h(), orderId);
   assert.ok(invite.html.includes("2 jours ouvrés")); assert.ok(invite.html.includes("site.example.com"));
   assert.equal(subscriptionCount, 0, "Preview must not create a Stripe session or charge");
@@ -211,7 +244,7 @@ test("notifications propriétaire : mensualités confirmées, reprises de webhoo
   assert.equal((await stripeEvent("invoice.paid", invoice())).status, 200);
   assert.equal((await stripeEvent("invoice.finalized", invoice())).status, 200);
   assert.equal(await db.commercialWebhook.count({ where: { key: "site-owner/" + orderId + "/SUBSCRIPTION_PAYMENT/" + invoiceId } }), 1);
-  const mails = await db.commercialEmail.findMany({ where: { kind: "SITE_OWNER_NOTICE", payloadEncrypted: { not: null } } });
+  const mails = await db.commercialEmail.findMany({ where: { siteOrderId: orderId, kind: "SITE_OWNER_NOTICE", payloadEncrypted: { not: null } } });
   for (const row of mails) {
     const mail = unseal(row.payloadEncrypted!) as { to: string[]; subject: string; text: string; html: string };
     assert.deepEqual(mail.to, ["contact@zelyweb.com"]);
@@ -221,4 +254,62 @@ test("notifications propriétaire : mensualités confirmées, reprises de webhoo
   }
   const monthly = mails.map(m => unseal(m.payloadEncrypted!) as { subject: string; text: string }).filter(m => m.subject.includes("Facture d’abonnement réglée"));
   assert.equal(monthly.length, 1); assert.ok(monthly[0].text.includes("34,80"));
+});
+
+test("fichiers privés, renvoi manuel sans doublon, remboursements et litiges sans suspension", async () => {
+  const file = await db.reviewFile.findFirstOrThrow({ where: { message: { round: { siteOrderId: orderId } } } });
+  const fileCtx = { params: Promise.resolve({ id: file.id }) };
+  assert.equal((await downloadReview(new NextRequest(`http://localhost:3001/api/review-files/${file.id}`), fileCtx)).status, 401);
+  const download = await downloadReview(new NextRequest(`http://localhost:3001/api/review-files/${file.id}`, { headers: { cookie: `${siteCookie(orderId)}=${token}` } }), fileCtx);
+  assert.equal(download.status, 200); assert.ok(download.headers.get("content-disposition")?.startsWith("attachment"));
+  const mail = await db.commercialEmail.findFirstOrThrow({ where: { siteOrderId: orderId, kind: "SITE_BILLING" } });
+  await db.commercialEmail.update({ where: { id: mail.id }, data: { status: "SENT" } });
+  const requestId = randomUUID();
+  await Promise.all([resendEmail(h(), mail.id, requestId), resendEmail(h(), mail.id, requestId)]);
+  assert.equal(await db.commercialEmail.count({ where: { resendOfId: mail.id } }), 1);
+  await assert.rejects(resendEmail(new Headers(), mail.id, randomUUID()), AdminAccessError);
+  await assert.rejects(resendEmail(h(), mail.id, randomUUID()), CommercialError);
+  const previousFetch = globalThis.fetch; let refunded = 12000, disputeStatus = "needs_response";
+  globalThis.fetch = async (url, init) => {
+    const path = new URL(String(url)).pathname;
+    if (path === "/v1/charges/ch_workflow_fixture") return Response.json({ id: "ch_workflow_fixture", livemode: false, customer: customerId, payment_intent: "pi_site_fixture", currency: "eur", amount: 42000, amount_refunded: refunded });
+    if (path === "/v1/disputes/dp_workflow_fixture") return Response.json({ id: "dp_workflow_fixture", charge: "ch_workflow_fixture", amount: 42000, status: disputeStatus });
+    return previousFetch(url, init);
+  };
+  try {
+    assert.equal((await stripeEvent("charge.refunded", { id: "ch_workflow_fixture" })).status, 200);
+    assert.equal((await stripeEvent("charge.refunded", { id: "ch_workflow_fixture" })).status, 200);
+    assert.equal((await db.siteOrder.findUniqueOrThrow({ where: { id: orderId } })).refundedCents, 12000);
+    refunded = 42000;
+    assert.equal((await stripeEvent("charge.refunded", { id: "ch_workflow_fixture", amount_refunded: 12000 })).status, 200);
+    assert.equal((await db.siteOrder.findUniqueOrThrow({ where: { id: orderId } })).refundedCents, 42000);
+    assert.equal(await db.financialEvent.count({ where: { siteOrderId: orderId, kind: "REFUND" } }), 1);
+    assert.equal((await stripeEvent("charge.dispute.created", { id: "dp_workflow_fixture" })).status, 200);
+    disputeStatus = "won";
+    assert.equal((await stripeEvent("charge.dispute.closed", { id: "dp_workflow_fixture", status: "needs_response" })).status, 200);
+    assert.equal((await db.siteOrder.findUniqueOrThrow({ where: { id: orderId } })).disputeStatus, "won");
+    assert.equal((await db.project.findUniqueOrThrow({ where: { id: projectId } })).stage, "PUBLISHED");
+  } finally { globalThis.fetch = previousFetch; }
+});
+
+test("reprise d’activation : aucun abonnement actif relancé et anciens événements neutralisés", async () => {
+  const source = await db.project.findUniqueOrThrow({ where: { id: projectId }, include: { lead: true } });
+  const copy = { ...source.lead, id: randomUUID(), requestId: randomUUID(), email: "retry-site@example.com" };
+  const lead = await db.lead.create({ data: copy });
+  const p = await db.project.create({ data: { leadId: lead.id, websiteUrl: "https://retry.example.com" } });
+  const o = await db.siteOrder.create({ data: { projectId: p.id, workflowVersion: 0, mode: "TEST", status: "PAID", creationPaidAt: new Date(), previewUrl: "https://preview.example.com", screenshot: "fixture", message: "fixture", tokenHash: "1".repeat(64), tokenEncrypted: "fixture", stripeCustomerId: "cus_retry_fixture", stripeSubscriptionId: "sub_retry_fixture", subscriptionStatus: "incomplete_expired", subscriptionInviteSentAt: new Date(), subscriptionAttempt: randomUUID(), subscriptionConsentAt: new Date() } });
+  const previousFetch = globalThis.fetch; let status = "active", calls = 0;
+  globalThis.fetch = async (url, init) => {
+    if (new URL(String(url)).pathname === "/v1/subscriptions/sub_retry_fixture") { calls++; return Response.json({ id: "sub_retry_fixture", status, customer: "cus_retry_fixture", metadata: { siteOrderId: o.id } }); }
+    return previousFetch(url, init);
+  };
+  try {
+    await assert.rejects(adminWorkflow(h(), o.id, { action: "retry-subscription" }), CommercialError);
+    status = "incomplete_expired";
+    const results = await Promise.allSettled([adminWorkflow(h(), o.id, { action: "retry-subscription" }), adminWorkflow(h(), o.id, { action: "retry-subscription" })]);
+    assert.equal(results.filter(r => r.status === "fulfilled").length, 1);
+    assert.equal((await db.siteOrder.findUniqueOrThrow({ where: { id: o.id } })).stripeSubscriptionId, null);
+    const before = calls; await syncSiteSubscription(o.id, "sub_retry_fixture"); assert.equal(calls, before);
+    assert.equal((await db.siteOrder.findUniqueOrThrow({ where: { id: o.id } })).subscriptionStatus, null);
+  } finally { globalThis.fetch = previousFetch; }
 });

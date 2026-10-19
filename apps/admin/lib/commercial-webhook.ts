@@ -51,6 +51,8 @@ export async function applyResendEvent(key: string, payload: ReturnType<Resend["
     await db.$transaction(async (tx) => {
       if (await tx.commercialWebhook.findUnique({ where: { key } })) return;
       const terminal = ["BOUNCED", "COMPLAINED", "DEAD"];
+      await tx.commercialEmail.updateMany({ where: { providerMessageId: providerId, deliveryStatus: { notIn: terminal } }, data: { deliveryStatus: status } });
+      await tx.commercialEmail.updateMany({ where: { providerMessageId: providerId, deliveryStatus: null }, data: { deliveryStatus: status } });
       await tx.clientMessage.updateMany({ where: { providerId, deliveryStatus: { notIn: terminal } }, data: { deliveryStatus: status } });
       await tx.commercialWebhook.create({ data: { key, provider: "RESEND", emailId: providerId, deliveryStatus: status } });
     });

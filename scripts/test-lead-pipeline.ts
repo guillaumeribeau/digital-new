@@ -60,6 +60,7 @@ async function main() {
     BETTER_AUTH_URL: "http://localhost:3001", BETTER_AUTH_SECRET: randomBytes(32).toString("base64"),
     COMMERCIAL_MODE: "local", COMMERCIAL_PUBLIC_URL: "http://localhost:3001", COMMERCIAL_ENCRYPTION_KEY: randomBytes(32).toString("base64"),
     COMMERCIAL_FROM_EMAIL: "NOVA Test <sender@example.com>", COMMERCIAL_REPLY_DOMAIN: "reponses.nova.test",
+    GA4_PROPERTY_ID: "559264383", GA4_SERVICE_ACCOUNT_EMAIL: "", GA4_SERVICE_ACCOUNT_PRIVATE_KEY: "",
     STRIPE_SECRET_KEY: "", STRIPE_WEBHOOK_SECRET: "", RESEND_WEBHOOK_SECRET: "",
   };
   try {
@@ -72,7 +73,7 @@ async function main() {
     await run(["--import", "tsx", "--test", "tests/integration/admin.test.ts"], env);
     await run(["--import", "tsx", "--test", "tests/integration/commercial.test.ts"], env);
     await run(["--import", "tsx", "--test", "tests/integration/site-billing.test.ts"], env);
-    if (process.argv.includes("--ui") || process.argv.includes("--commercial-ui") || process.argv.includes("--trash-ui") || process.argv.includes("--billing-ui")) {
+    if (process.argv.includes("--ui") || process.argv.includes("--commercial-ui") || process.argv.includes("--trash-ui") || process.argv.includes("--billing-ui") || process.argv.includes("--operations-ui")) {
       const adminPort = await freePort(), websitePort = await freePort();
       const uiEnv: NodeJS.ProcessEnv & { BETTER_AUTH_URL: string; NEXT_PUBLIC_SITE_URL: string } = { ...env, BETTER_AUTH_URL: `http://127.0.0.1:${adminPort}`, NEXT_PUBLIC_SITE_URL: `http://127.0.0.1:${websitePort}`, NEXT_PUBLIC_GTM_ID: "", NEXT_TELEMETRY_DISABLED: "1" };
       Object.assign(uiEnv, { LEAD_EMAIL_MODE: "local", LOCAL_EMAIL_PREVIEW_TOKEN: randomBytes(32).toString("hex") });
@@ -87,6 +88,7 @@ async function main() {
         servers.push(spawn(process.execPath, ["node_modules/next/dist/bin/next", "dev", "apps/website", "--hostname", "127.0.0.1", "--port", String(websitePort)], { env: nextEnv, windowsHide: true, stdio: "inherit" }));
         await Promise.all([ready(uiEnv.BETTER_AUTH_URL + "/connexion"), ready(uiEnv.NEXT_PUBLIC_SITE_URL + "/")]);
         if (process.argv.includes("--billing-ui")) await run(["--import", "tsx", "scripts/check-site-billing-ui.ts"], uiEnv);
+        else if (process.argv.includes("--operations-ui")) await run(["--import", "tsx", "scripts/check-operations-ui.ts"], uiEnv);
         else if (process.argv.includes("--trash-ui")) await run(["--import", "tsx", "scripts/check-lead-trash-ui.ts"], uiEnv);
         else {
         if (!process.argv.includes("--commercial-ui")) await run(["--import", "tsx", "scripts/check-admin-ui.ts"], uiEnv);

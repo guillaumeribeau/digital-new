@@ -1,5 +1,5 @@
 "use client";
-import Link from "next/link";
+import Link from "@/components/ui/tracked-link";
 import { track } from "@/lib/analytics";
 export function CTA({
   children = "Découvrir mon futur site",
