@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next";
 import { brand } from "@/config/brand.config";
+import { adviceArticles, advicePath } from "@/content/advice";
 export default function sitemap(): MetadataRoute.Sitemap {
   if (!brand.domain) return [];
   return [
@@ -9,6 +10,8 @@ export default function sitemap(): MetadataRoute.Sitemap {
     "/comment-ca-marche",
     "/faq",
     "/demander-mon-site",
+    "/conseils",
+    ...adviceArticles.map(({ slug }) => advicePath(slug)),
     "/conditions-generales",
     "/mentions-legales",
     "/politique-confidentialite",

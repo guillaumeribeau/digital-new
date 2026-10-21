@@ -10,6 +10,7 @@ const nav = [
   ["Notre offre", "/notre-offre"],
   ["Exemples", "/exemples"],
   ["Comment ça marche", "/comment-ca-marche"],
+  ["Conseils", "/conseils"],
   ["FAQ", "/faq"],
 ];
 export function Header() {
@@ -66,7 +67,7 @@ export function Header() {
         <nav className="desktop-nav" aria-label="Navigation principale">
           {nav.map(([label, url]) => (
             <Link
-              aria-current={pathname === url ? "page" : undefined}
+              aria-current={pathname === url ? "page" : pathname.startsWith(url + "/") ? "location" : undefined}
               key={url}
               href={url}
             >

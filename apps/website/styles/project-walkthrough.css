@@ -1,0 +1,30 @@
+.project-example { background: #e8eddf; padding: 80px 0; scroll-margin-top: 110px; }
+.project-example-header { display: grid; grid-template-columns: 1.1fr 1fr; gap: 64px; align-items: end; margin-bottom: 48px; }
+.project-example-header h2 { font-size: clamp(32px, 3.8vw, 52px); line-height: 1.12; letter-spacing: -1.8px; margin: 20px 0 0; }
+.project-example-header h2 span { color: var(--blue); }
+.project-example-header p:not(.eyebrow) { font-size: 15px; line-height: 1.85; color: #41483e; }
+.project-example-header .project-example-disclaimer { font-size: 12px; margin-bottom: 0; }
+.project-example-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 26px; }
+.project-example-steps > li { display: grid; grid-template-columns: 66px minmax(0, 1fr); gap: 24px; align-items: start; }
+.project-example-number { font-family: var(--display); font-size: 48px; letter-spacing: -2px; color: var(--blue); padding-top: 25px; }
+.project-example-card { background: var(--paper); border: 1px solid #c9cfc3; padding: 30px; }
+.project-example-card h3 { font-size: 26px; letter-spacing: -0.7px; line-height: 1.3; margin: 0 0 25px; }
+.project-example-card dl { margin: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 24px 32px; }
+.project-example-card dt { color: var(--blue); font-size: 10px; letter-spacing: 0.07em; font-weight: 600; margin-bottom: 10px; }
+.project-example-card dd { margin: 0; font-size: 14px; line-height: 1.85; color: #41483e; }
+.project-example-card .project-example-payment { grid-column: 1 / -1; padding-top: 20px; border-top: 1px solid var(--line); }
+.project-example-payment dd { font-weight: 500; }
+.project-example-footer { margin: 30px 0 0 90px; }
+.project-example-footer p { font-size: 12px; line-height: 1.8; color: var(--muted); max-width: 780px; }
+.project-example-footer > div { display: flex; flex-wrap: wrap; gap: 14px 30px; margin-top: 20px; }
+.project-example-footer a { font-size: 13px; color: var(--blue); text-decoration: underline; text-underline-offset: 4px; }
+@media (max-width: 800px) {
+  .project-example { padding: 55px 0; }
+  .project-example-header { grid-template-columns: 1fr; gap: 16px; margin-bottom: 30px; }
+  .project-example-steps > li { grid-template-columns: 1fr; gap: 10px; }
+  .project-example-number { font-size: 34px; padding-top: 0; }
+  .project-example-card { padding: 24px; }
+  .project-example-card h3 { font-size: 23px; }
+  .project-example-card dl { grid-template-columns: 1fr; gap: 22px; }
+  .project-example-footer { margin-left: 0; }
+}

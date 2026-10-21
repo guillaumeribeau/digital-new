@@ -1,0 +1,154 @@
+.advice-page { background: var(--paper); }
+.advice-intro { padding-top: 80px; padding-bottom: 65px; }
+.advice-intro h1 { font-size: clamp(42px, 5.4vw, 76px); line-height: 1.06; letter-spacing: -3px; margin: 22px 0 28px; }
+.advice-intro h1 span { color: var(--blue); }
+.advice-intro > p:last-child { max-width: 650px; color: var(--muted); font-size: 17px; line-height: 1.9; }
+.advice-library { padding-bottom: 90px; }
+.advice-library-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 24px; border-top: 1px solid var(--line); padding: 30px 0; }
+.advice-library-heading h2 { font-size: 26px; margin: 0; letter-spacing: -0.7px; }
+.advice-library-heading > span { font-size: 10px; letter-spacing: 0.08em; color: var(--muted); }
+.advice-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 22px; }
+.advice-card { display: flex; flex-direction: column; padding: 32px; border: 1px solid #c9cfc3; background: #eceee7; transition: border-color 0.2s, background 0.2s; }
+.advice-card:hover { border-color: var(--blue); background: #e5e9df; }
+.advice-card-top { display: flex; align-items: center; justify-content: space-between; color: var(--blue); margin-bottom: 52px; }
+.advice-card-top > span { font-family: var(--display); font-size: 48px; line-height: 1; letter-spacing: -2px; }
+.advice-card .eyebrow { font-size: 9px; color: var(--muted); }
+.advice-card h3 { font-size: clamp(23px, 2.2vw, 31px); line-height: 1.22; letter-spacing: -1px; margin: 17px 0; }
+.advice-card-description { font-size: 13px; line-height: 1.85; color: var(--muted); margin: 0 0 32px; }
+.advice-card-link { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: auto; padding-top: 20px; border-top: 1px solid #c9cfc3; font-size: 12px; font-weight: 600; color: var(--blue); }
+.advice-invitation { padding: 65px 0; background: #e8eddf; }
+.advice-invitation .container { display: flex; align-items: center; justify-content: space-between; gap: 40px; }
+.advice-invitation h2 { font-size: 38px; letter-spacing: -1.5px; margin: 16px 0; }
+.advice-invitation p:last-child { max-width: 630px; font-size: 14px; line-height: 1.9; color: var(--muted); }
+.advice-invitation .button { flex-shrink: 0; }
+.advice-breadcrumb { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding-top: 30px; font-size: 11px; color: var(--muted); }
+.advice-breadcrumb a:hover { color: var(--blue); }
+.advice-article-header { padding: 58px 0 42px; max-width: 1000px; }
+.advice-article-header h1 { font-size: clamp(36px, 4.7vw, 65px); line-height: 1.12; letter-spacing: -2.5px; margin: 22px 0 27px; }
+.advice-article-introduction { max-width: 830px; font-size: 18px; line-height: 1.9; color: var(--muted); }
+.advice-byline { font-size: 11px; color: var(--muted); margin-top: 27px; }
+.advice-article-layout { display: grid; grid-template-columns: 260px minmax(0, 780px); justify-content: space-between; gap: 64px; border-top: 1px solid var(--line); padding-top: 42px; }
+.advice-sidebar { align-self: start; position: sticky; top: 120px; }
+.advice-sidebar nav ol { list-style: none; padding: 0; margin: 22px 0 30px; display: grid; gap: 0; counter-reset: advice-section; }
+.advice-sidebar li { counter-increment: advice-section; border-bottom: 1px solid var(--line); }
+.advice-sidebar li a { display: grid; grid-template-columns: 18px 1fr; gap: 10px; font-size: 12px; line-height: 1.6; padding: 14px 0; color: var(--muted); }
+.advice-sidebar li a::before { content: counter(advice-section, decimal-leading-zero); color: var(--blue); font-size: 10px; padding-top: 2px; }
+.advice-sidebar li a:hover { color: var(--blue); }
+.advice-sidebar-offer { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 12px; line-height: 1.6; font-weight: 600; color: var(--blue); }
+.advice-sidebar-offer svg { flex-shrink: 0; }
+.advice-article-body { min-width: 0; }
+.advice-takeaway { background: #e8eddf; border-left: 3px solid var(--blue); padding: 27px 30px; margin-bottom: 45px; }
+.advice-takeaway .eyebrow { color: var(--blue); font-size: 10px; }
+.advice-takeaway > p:last-child { font-size: 16px; line-height: 1.85; margin: 13px 0 0; }
+.advice-section { margin-bottom: 44px; scroll-margin-top: 115px; }
+.advice-section h2, .advice-next-step h2 { font-size: 28px; line-height: 1.3; letter-spacing: -0.7px; margin: 0 0 20px; }
+.advice-section > p, .advice-section li, .advice-next-step > p { font-size: 16px; line-height: 1.9; color: #41483e; }
+.advice-section > p { margin: 0 0 18px; }
+.advice-section ul { padding-left: 23px; margin: 22px 0; }
+.advice-section li { margin-bottom: 9px; padding-left: 5px; }
+.advice-section li::marker { color: var(--blue); }
+.advice-example { padding: 24px 28px; background: #eceee7; margin-top: 24px; }
+.advice-example h3 { color: var(--blue); font-size: 14px; margin: 0 0 10px; }
+.advice-example p { font-size: 14px; line-height: 1.85; margin: 0; color: #41483e; }
+.advice-section .advice-section-links { list-style: none; padding: 0; margin-top: 24px; }
+.advice-section-links li { padding: 0; }
+.advice-section-links a { display: inline-flex; align-items: baseline; gap: 8px; font-size: 13px; color: var(--blue); text-decoration: underline; text-underline-offset: 4px; }
+.advice-section-links svg { flex-shrink: 0; align-self: center; }
+.advice-table-scroll { overflow-x: auto; margin: 24px 0; }
+.advice-table-scroll table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.advice-table-scroll caption { text-align: left; font-size: 12px; color: var(--muted); padding-bottom: 15px; line-height: 1.7; }
+.advice-table-scroll th, .advice-table-scroll td { padding: 16px; border-bottom: 1px solid #c9cfc3; text-align: left; }
+.advice-table-scroll thead { background: #eceee7; }
+.advice-table-scroll tbody th { font-weight: 400; }
+.advice-table-scroll td { white-space: nowrap; }
+.advice-table-scroll tbody tr:last-child { font-weight: 600; background: #e8eddf; }
+.advice-table-scroll tbody tr:last-child th { font-weight: 600; }
+.advice-next-step { border-top: 1px solid var(--line); padding: 34px 0; }
+.advice-next-step .button { margin-top: 8px; }
+.advice-next-step .advice-conditions { font-size: 12px; line-height: 1.8; margin-top: 22px; }
+.advice-conditions a { text-decoration: underline; text-underline-offset: 3px; }
+.advice-back { display: inline-flex; align-items: center; gap: 12px; color: var(--blue); font-size: 12px; font-weight: 600; }
+.advice-related { padding: 75px 0 85px; margin-top: 60px; border-top: 1px solid var(--line); }
+.advice-related h2 { font-size: 34px; letter-spacing: -1px; margin: 18px 0 30px; }
+.advice-related > div { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+.advice-related a { display: flex; align-items: center; justify-content: space-between; gap: 25px; padding: 28px; border: 1px solid #c9cfc3; font-family: var(--display); font-size: 23px; line-height: 1.4; }
+.advice-related a:hover { border-color: var(--blue); color: var(--blue); }
+.advice-related svg { flex-shrink: 0; }
+@media (max-width: 1000px) {
+  .advice-card { padding: 25px; }
+  .advice-article-layout { grid-template-columns: 210px minmax(0, 1fr); gap: 35px; }
+  .advice-invitation .container { align-items: flex-start; flex-direction: column; gap: 24px; }
+}
+@media (max-width: 767px) {
+  .advice-intro { padding-top: 48px; padding-bottom: 42px; }
+  .advice-intro h1 { letter-spacing: -1.8px; }
+  .advice-intro > p:last-child { font-size: 15px; }
+  .advice-library { padding-bottom: 55px; }
+  .advice-library-heading { display: block; }
+  .advice-library-heading h2 { font-size: 24px; margin-bottom: 12px; }
+  .advice-cards { grid-template-columns: 1fr; gap: 18px; }
+  .advice-card-top { margin-bottom: 32px; }
+  .advice-card h3 { font-size: 28px; }
+  .advice-invitation { padding: 45px 0; }
+  .advice-invitation h2 { font-size: 32px; }
+  .advice-invitation .button { width: 100%; }
+  .advice-breadcrumb { font-size: 10px; gap: 8px; }
+  .advice-article-header { padding: 38px 0 30px; }
+  .advice-article-header h1 { letter-spacing: -1.5px; }
+  .advice-article-introduction { font-size: 16px; }
+  .advice-byline { line-height: 1.8; }
+  .advice-article-layout { grid-template-columns: 1fr; gap: 32px; padding-top: 30px; }
+  .advice-sidebar { position: static; }
+  .advice-sidebar nav ol { margin: 12px 0 20px; }
+  .advice-sidebar li a { padding: 11px 0; }
+  .advice-takeaway { padding: 23px; margin-bottom: 35px; }
+  .advice-takeaway > p:last-child { font-size: 15px; }
+  .advice-section h2, .advice-next-step h2 { font-size: 25px; }
+  .advice-section > p, .advice-section li, .advice-next-step > p { font-size: 15px; }
+  .advice-example { padding: 22px; }
+  .advice-table-scroll th, .advice-table-scroll td { padding: 12px 10px; font-size: 12px; }
+  .advice-next-step .button { max-width: 100%; font-size: 13px; padding-inline: 18px; }
+  .advice-related { padding: 45px 0 55px; margin-top: 40px; }
+  .advice-related h2 { font-size: 29px; }
+  .advice-related > div { grid-template-columns: 1fr; gap: 16px; }
+  .advice-related a { font-size: 21px; padding: 23px; }
+}
+.budget-comparison { margin-bottom: 48px; }
+.budget-comparison > h2 { font-size: 30px; line-height: 1.2; letter-spacing: -1px; margin: 18px 0; }
+.budget-scenario-note { font-size: 14px; line-height: 1.85; color: #41483e; margin-bottom: 24px; }
+.budget-total-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.budget-total-card { padding: 27px; background: #eceee7; border: 1px solid #c9cfc3; }
+.budget-total-card.budget-total-zelyweb { background: #18231e; color: var(--paper); border-color: #18231e; }
+.budget-total-card .eyebrow { font-size: 10px; line-height: 1.7; }
+.budget-total-card.budget-total-zelyweb .eyebrow { color: var(--yellow); }
+.budget-total-card .budget-total { font-family: var(--display); font-size: clamp(35px, 3.3vw, 48px); letter-spacing: -1.8px; line-height: 1.15; margin: 26px 0 21px; }
+.budget-total span { display: block; font-family: var(--body); font-size: 12px; letter-spacing: 0; line-height: 1.5; margin-top: 8px; }
+.budget-total-card > p:not(.budget-total):not(.eyebrow) { font-size: 12px; line-height: 1.8; }
+.budget-total-card .budget-total-ttc { padding-top: 15px; margin-top: 15px; border-top: 1px solid #a6b09e; }
+.budget-total-zelyweb .budget-total-ttc { border-color: #ffffff40; color: #d5decf; }
+.budget-saving { background: #e8eddf; border-left: 3px solid var(--blue); padding: 22px 25px; margin-top: 18px; }
+.budget-saving strong { display: block; font-family: var(--display); font-size: 28px; letter-spacing: -0.8px; color: var(--blue); }
+.budget-saving span { display: block; font-size: 13px; line-height: 1.8; margin-top: 6px; }
+.budget-scenario-footnote { font-size: 12px; line-height: 1.85; color: var(--muted); margin-top: 18px; }
+.budget-guide .advice-table-scroll td { white-space: normal; line-height: 1.7; vertical-align: top; }
+.budget-guide .advice-table-scroll th { vertical-align: top; line-height: 1.7; }
+.budget-guide .advice-table-scroll th:first-child { width: 32%; }
+.budget-guide .advice-table-scroll th:nth-child(2), .budget-guide .advice-table-scroll td:nth-child(2) { background: #e8eddf; }
+.advice-table-plain tbody tr:last-child { background: transparent; font-weight: 400; }
+.advice-table-plain tbody tr:last-child th { font-weight: 400; }
+.budget-advantages { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 25px; }
+.budget-advantages > div { padding: 24px; border: 1px solid #c9cfc3; }
+.budget-advantages > div > span { color: var(--blue); font-size: 11px; }
+.budget-advantages h3 { font-size: 21px; letter-spacing: -0.5px; line-height: 1.3; margin: 16px 0 12px; }
+.budget-advantages p { font-size: 14px; line-height: 1.85; color: #41483e; margin: 0; }
+@media (max-width: 600px) {
+  .budget-total-cards, .budget-advantages { grid-template-columns: 1fr; }
+  .budget-total-card { padding: 25px; }
+  .budget-total-card .budget-total { font-size: 43px; }
+  .budget-comparison > h2 { font-size: 27px; }
+  .budget-saving strong { font-size: 26px; }
+  .budget-guide .advice-table-scroll table { min-width: 540px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .advice-card { transition: none; }
+}

@@ -17,6 +17,7 @@ export function Footer() {
         </p>
         <div>
           <span className="eyebrow">PARTOUT EN FRANCE</span>
+          <p><Link className="text-link" href="/conseils">Les conseils pour votre site</Link></p>
           <p>
             Artisans, commerçants, indépendants,
             <br />
