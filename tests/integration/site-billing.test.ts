@@ -3,7 +3,7 @@ import { resendEmail } from "../../apps/admin/lib/operations";
 import { GET as downloadReview } from "../../apps/admin/app/api/review-files/[id]/route";
 import { after, test } from "node:test";
 import assert from "node:assert/strict";
-import { randomUUID } from "node:crypto";
+import { randomUUID, randomBytes } from "node:crypto";
 import sharp from "sharp";
 import { getDb } from "@nova/database";
 import { hashPassword } from "better-auth/crypto";
@@ -14,8 +14,10 @@ import { POST as access } from "../../apps/admin/app/api/client/sites/access/rou
 import { GET as clientGet, POST as clientPost } from "../../apps/admin/app/api/client/sites/[id]/route";
 import { adminService, BusinessError } from "../../apps/admin/lib/service";
 import { AdminAccessError } from "../../apps/admin/lib/access";
-import { saveSitePresentation, sendSitePresentation, checkoutSite, prepareRevisionEmail, sendRevisionEmail, prepareSiteSubscription, sendSiteSubscription, checkoutSiteSubscription, sitePortal, syncSiteSubscription } from "../../apps/admin/lib/site-billing";
-import { unseal, CommercialError } from "../../apps/admin/lib/commercial-core";
+import { saveSitePresentation, sendSitePresentation, checkoutSite, prepareRevisionEmail, prepareSiteSubscription, sendSiteSubscription, checkoutSiteSubscription, sitePortal, syncSiteSubscription } from "../../apps/admin/lib/site-billing";
+import { unseal, seal, digest, CommercialError } from "../../apps/admin/lib/commercial-core";
+import { applySiteInbound, storedInboundAttachment } from "../../apps/admin/lib/site-inbound";
+import { siteReplyAddress } from "../../apps/admin/lib/site-workflow-mail";
 import { stripeClient } from "../../apps/admin/lib/commercial-payment";
 import { siteCookie } from "../../apps/admin/lib/site-access";
 import { leadRepository } from "../../apps/website/lib/lead-repository";
@@ -41,6 +43,15 @@ function request(body?: unknown, privateToken = token) {
 }
 const ctx = () => ({ params: Promise.resolve({ id: orderId }) });
 after(async () => { globalThis.fetch = originalFetch; await db.$disconnect(); });
+
+async function workflowFixture() {
+  const source = await db.project.findUniqueOrThrow({ where: { id: projectId }, include: { lead: true } });
+  const lead = await db.lead.create({ data: { ...source.lead, id: randomUUID(), requestId: randomUUID(), email: `workflow-${randomUUID()}@example.com` } });
+  const project = await db.project.create({ data: { leadId: lead.id, stage: "PAID" } });
+  const secret = randomBytes(32).toString("base64url");
+  const order = await db.siteOrder.create({ data: { projectId: project.id, mode: "TEST", status: "PAID", creationPaidAt: new Date(), previewUrl: "https://preview.example.com", screenshot: "fixture", message: "Projet de test", tokenHash: digest(secret), tokenEncrypted: seal(secret) } });
+  return { order, lead, project };
+}
 
 test("présentation privée, aperçu HTML, prix figé, accès et consentement obligatoires", async () => {
   await assert.rejects(saveSitePresentation(new Headers(), {}), AdminAccessError);
@@ -140,15 +151,10 @@ test("checkout serveur sans doublon, facture et carte enregistrée seulement sur
 
 test("premier mois refusé bloque la publication ; régularisation, factures, retard de webhook et portail", async () => {
   await assert.rejects(prepareRevisionEmail(new Headers(), orderId, "Vos textes sont-ils corrects ?"), AdminAccessError);
-  const revision = await prepareRevisionEmail(h(), orderId, "Questions personnalisées : vos textes et photos vous conviennent-ils ? <script>indésirable</script>");
-  assert.ok(revision.html.includes("420,00")); assert.ok(!revision.html.includes("<script>"));
-  await assert.rejects(sendRevisionEmail(h(), orderId, revision.version + 1), CommercialError);
-  const revisionPreview = await db.commercialEmail.count({ where: { siteOrderId: orderId, kind: "SITE_REVISION_REQUEST" } }); assert.equal(revisionPreview, 0);
-  await sendRevisionEmail(h(), orderId, revision.version);
-  await assert.rejects(sendRevisionEmail(h(), orderId, revision.version), CommercialError);
-  const revisionMail = unseal((await db.commercialEmail.findFirstOrThrow({ where: { siteOrderId: orderId, kind: "SITE_REVISION_REQUEST" } })).payloadEncrypted!) as { reply_to: string; html: string; text: string };
-  assert.equal(revisionMail.reply_to, "contact@zelyweb.com"); assert.ok(revisionMail.text.includes("Trois séries"));
-  assert.equal(await db.commercialEmail.count({ where: { siteOrderId: orderId, kind: "SITE_REVISION_REQUEST" } }), 1);
+  const revisionMail = unseal((await db.commercialEmail.findFirstOrThrow({ where: { siteOrderId: orderId, kind: "SITE_REVIEW_INVITE" } })).payloadEncrypted!) as { reply_to: string; html: string; text: string };
+  assert.ok(revisionMail.reply_to.startsWith("s1-")); assert.ok(revisionMail.text.includes("première"));
+  assert.equal(await db.commercialEmail.count({ where: { siteOrderId: orderId, kind: "SITE_REVIEW_INVITE" } }), 1);
+  assert.equal(await db.commercialEmail.count({ where: { siteOrderId: orderId, kind: "SITE_DOMAIN_INVITE" } }), 1);
   let project = await db.project.findUniqueOrThrow({ where: { id: projectId } });
   await adminService.projectLinks(h(), { id: projectId, expectedUpdatedAt: project.updatedAt.toISOString(), previewUrl: "https://preview.example.com", websiteUrl: "https://site.example.com" });
   await db.project.update({ where: { id: projectId }, data: { stage: "PAID" } });
@@ -158,23 +164,27 @@ test("premier mois refusé bloque la publication ; régularisation, factures, re
   const domain = (await workflowData(orderId)).domainOptions[0];
   await clientWorkflow(orderId, { action: "domain", kind: "OPTION", optionId: domain.id, agreement: true });
   const requestId = randomUUID();
-  await Promise.all([clientWorkflow(orderId, { action: "feedback", requestId, message: "Modifier le texte accueil" }, [checkUpload("photo.pdf", Buffer.from("%PDF-1.7\nfixture"))]), clientWorkflow(orderId, { action: "feedback", requestId, message: "Modifier le texte accueil" }, [checkUpload("photo.pdf", Buffer.from("%PDF-1.7\nfixture"))])]);
+  await Promise.all([clientWorkflow(orderId, { action: "feedback", version: 1, requestId, message: "Modifier le texte accueil" }, [checkUpload("photo.pdf", Buffer.from("%PDF-1.7\nfixture"))]), clientWorkflow(orderId, { action: "feedback", version: 1, requestId, message: "Modifier le texte accueil" }, [checkUpload("photo.pdf", Buffer.from("%PDF-1.7\nfixture"))])]);
   let workflow = await workflowData(orderId); assert.equal(workflow.reviewRounds.length, 1); assert.equal(workflow.reviewRounds[0].messages.length, 1);
   await assert.rejects(clientWorkflow(orderId, { action: "approve", name: "Client Fictif", version: 1, agreement: true }), CommercialError);
-  await adminWorkflow(h(), orderId, { action: "close", roundId: workflow.reviewRounds[0].id });
+  await adminWorkflow(h(), orderId, { action: "deliver", roundId: workflow.reviewRounds[0].id, expectedVersion: 1, url: "https://preview.example.com/v2", requestId: randomUUID() });
   const originalPaidAt = (await db.siteOrder.findUniqueOrThrow({ where: { id: orderId } })).creationPaidAt;
   await db.siteOrder.update({ where: { id: orderId }, data: { creationPaidAt: new Date(Date.now() - 31 * 86400000) } });
   await assert.rejects(clientWorkflow(orderId, { action: "feedback", requestId: randomUUID(), message: "Hors délai" }), CommercialError);
   await db.siteOrder.update({ where: { id: orderId }, data: { creationPaidAt: originalPaidAt } });
-  for (let n = 2; n <= 3; n++) { await clientWorkflow(orderId, { action: "feedback", requestId: randomUUID(), message: "Série suivante " + n }); const open = (await workflowData(orderId)).reviewRounds.find(r => r.status === "OPEN")!; await adminWorkflow(h(), orderId, { action: "close", roundId: open.id }); }
-  await assert.rejects(clientWorkflow(orderId, { action: "feedback", requestId: randomUUID(), message: "Quatrième série refusée" }), CommercialError);
-  await clientWorkflow(orderId, { action: "approve", name: "Client Fictif", version: 1, agreement: true });
-  await adminWorkflow(h(), orderId, { action: "version", url: "https://preview.example.com/v2" });
+  for (let n = 2; n <= 3; n++) {
+    await clientWorkflow(orderId, { action: "feedback", version: n, requestId: randomUUID(), message: "Série suivante " + n });
+    const open = (await workflowData(orderId)).reviewRounds.find(r => r.status === "OPEN")!;
+    await adminWorkflow(h(), orderId, { action: "deliver", roundId: open.id, expectedVersion: n, url: "https://preview.example.com/v" + (n + 1), requestId: randomUUID() });
+  }
+  await assert.rejects(clientWorkflow(orderId, { action: "feedback", version: 4, requestId: randomUUID(), message: "Quatrième série refusée" }), CommercialError);
+  await clientWorkflow(orderId, { action: "approve", name: "Client Fictif", version: 4, agreement: true });
+  await adminWorkflow(h(), orderId, { action: "version", url: "https://preview.example.com/v5" });
   await assert.rejects(prepareSiteSubscription(h(), orderId), CommercialError);
-  await assert.rejects(clientWorkflow(orderId, { action: "approve", name: "Client Fictif", version: 1, agreement: true }), CommercialError);
-  await clientWorkflow(orderId, { action: "approve", name: "Client Fictif", version: 2, agreement: true });
-  await clientWorkflow(orderId, { action: "feedback", requestId, message: "Modifier le texte accueil" });
-  workflow = await workflowData(orderId); assert.equal(workflow.reviewVersion, 2); assert.ok(workflow.finalApprovedAt, "Un ancien retour rejoué ne doit pas annuler un nouvel accord");
+  await assert.rejects(clientWorkflow(orderId, { action: "approve", name: "Client Fictif", version: 4, agreement: true }), CommercialError);
+  await clientWorkflow(orderId, { action: "approve", name: "Client Fictif", version: 5, agreement: true });
+  await clientWorkflow(orderId, { action: "feedback", version: 1, requestId, message: "Modifier le texte accueil" });
+  workflow = await workflowData(orderId); assert.equal(workflow.reviewVersion, 5); assert.ok(workflow.finalApprovedAt, "Un ancien retour rejoué ne doit pas annuler un nouvel accord");
   await assert.rejects(db.$transaction(async tx => requireWorkflowReady(tx, await tx.siteOrder.findUniqueOrThrow({ where: { id: orderId } }), true)), CommercialError);
   await assert.rejects(adminWorkflow(h(), orderId, { action: "domain-ready" }), CommercialError);
   const paidDomainQuote = await db.quote.create({ data: { leadId: project.leadId, number: "DOM-" + randomUUID(), title: "Supplément domaine", snapshot: { fixture: true }, documentHash: "f".repeat(64), acceptanceHash: "f".repeat(64), acceptedName: "Client Fictif", acceptedAt: new Date(), status: "PAID", paymentMode: "LOCAL", paidAt: new Date(), items: [], subtotalCents: 500, taxCents: 100, totalCents: 600, billingAddress: "Adresse fictive", deliveryTime: "2 jours", terms: "Fixture", validUntil: new Date(Date.now() + 86400000) } });
@@ -290,6 +300,76 @@ test("fichiers privés, renvoi manuel sans doublon, remboursements et litiges sa
     assert.equal((await db.siteOrder.findUniqueOrThrow({ where: { id: orderId } })).disputeStatus, "won");
     assert.equal((await db.project.findUniqueOrThrow({ where: { id: projectId } })).stage, "PUBLISHED");
   } finally { globalThis.fetch = previousFetch; }
+});
+
+test("séries verrouillées, livraison atomique, e-mails par version et validation anticipée", async () => {
+  const { order } = await workflowFixture();
+  const first = { action: "feedback", version: 1, requestId: randomUUID(), message: "Changer le titre" };
+  await clientWorkflow(order.id, first);
+  await assert.rejects(clientWorkflow(order.id, { ...first, requestId: randomUUID(), message: "Ajout pendant les corrections" }), CommercialError);
+  const round = (await workflowData(order.id)).reviewRounds[0];
+  const deliver = { action: "deliver", roundId: round.id, expectedVersion: 1, url: "https://preview.example.com/corrected", message: "Le titre est corrigé.", requestId: randomUUID() };
+  await Promise.all([adminWorkflow(h(), order.id, deliver), adminWorkflow(h(), order.id, deliver)]);
+  const current = await workflowData(order.id); assert.equal(current.reviewVersion, 2); assert.equal(current.reviewRounds[0].status, "CLOSED");
+  assert.equal(await db.commercialEmail.count({ where: { siteOrderId: order.id, kind: "SITE_REVIEW_INVITE" } }), 1);
+  const mail = unseal((await db.commercialEmail.findFirstOrThrow({ where: { siteOrderId: order.id, kind: "SITE_REVIEW_INVITE" } })).payloadEncrypted!) as { subject: string; reply_to: string; text: string };
+  assert.ok(mail.subject.includes("2/3")); assert.ok(mail.reply_to.startsWith("s2-")); assert.ok(mail.text.includes("corrected"));
+  await assert.rejects(clientWorkflow(order.id, { action: "feedback", version: 1, requestId: randomUUID(), message: "Ancien formulaire" }), CommercialError);
+  await clientWorkflow(order.id, { action: "approve", version: 2, agreement: true, name: "Client Fictif" });
+  await assert.rejects(clientWorkflow(order.id, { action: "feedback", version: 2, requestId: randomUUID(), message: "Après accord final" }), CommercialError);
+  await clientWorkflow(order.id, { action: "extra-request", requestId: randomUUID(), message: "Une nouvelle page sur devis" });
+  assert.equal(await db.siteInboundEmail.count({ where: { siteOrderId: order.id, state: "QUOTE_REQUEST" } }), 1);
+  assert.equal((await workflowData(order.id)).inboundEmails.length, 0, "Les courriers internes ne sont jamais exposés au portail client");
+});
+
+test("domaine séparé, plafond initial et annuel, renvoi idempotent, réservation et changement de renouvellement", async () => {
+  const { order } = await workflowFixture();
+  await clientWorkflow(order.id, { action: "feedback", version: 1, requestId: randomUUID(), message: "Corriger le titre" });
+  await clientWorkflow(order.id, { action: "domain", kind: "REQUESTED", domain: "domaine-fictif.fr", agreement: true });
+  assert.equal((await workflowData(order.id)).reviewRounds.length, 1, "Le domaine reste accessible pendant les corrections");
+  const resend = { action: "domain-invite", requestId: randomUUID() };
+  await Promise.all([adminWorkflow(h(), order.id, resend), adminWorkflow(h(), order.id, resend)]);
+  assert.equal(await db.commercialEmail.count({ where: { siteOrderId: order.id, kind: "SITE_DOMAIN_INVITE" } }), 1);
+  await adminWorkflow(h(), order.id, { action: "options", requestId: randomUUID(), options: [{ domain: "domaine-fictif.fr", initialHtCents: 1500, renewalHtCents: 3000, recommended: true }] });
+  const option = (await workflowData(order.id)).domainOptions[0];
+  await clientWorkflow(order.id, { action: "domain", kind: "OPTION", optionId: option.id, agreement: true });
+  const snap = (await workflowData(order.id)).domainSelection!.acceptedSnapshot as { initialSupplementHtCents: number; renewalSupplementHtCents: number };
+  assert.equal(snap.initialSupplementHtCents, 0); assert.equal(snap.renewalSupplementHtCents, 1000);
+  await adminWorkflow(h(), order.id, { action: "domain-reserved", requestId: randomUUID(), renewalAt: "2027-10-23" });
+  assert.equal((await workflowData(order.id)).domainSelection!.status, "RESERVED");
+  assert.equal((await workflowData(order.id)).domainReadyAt, null);
+  await assert.rejects(clientWorkflow(order.id, { action: "domain", kind: "REQUESTED", domain: "autre.fr", agreement: true }), CommercialError);
+  await adminWorkflow(h(), order.id, { action: "domain-ready" });
+  await assert.rejects(adminWorkflow(h(), order.id, { action: "domain-renewal", requestId: randomUUID(), renewalHtCents: 3000, renewalAt: "2027-10-23" }), CommercialError);
+  const changeId = randomUUID();
+  await adminWorkflow(h(), order.id, { action: "domain-renewal", requestId: changeId, renewalHtCents: 4000, renewalAt: "2027-10-23" });
+  await clientWorkflow(order.id, { action: "domain-renewal", requestId: changeId, agreement: true, name: "Client Fictif" });
+  const updated = (await workflowData(order.id)).domainSelection!;
+  assert.ok((updated.renewalProposal as { approvedAt: string }).approvedAt);
+  assert.equal((updated.acceptedSnapshot as { renewalSupplementHtCents: number }).renewalSupplementHtCents, 2000);
+  assert.equal((await db.siteOrder.findUniqueOrThrow({ where: { id: order.id } })).stripeSubscriptionId, null);
+});
+
+test("réponses e-mail archivées avec pièces jointes, doublons, attentes et identité contrôlés", async () => {
+  const { order, lead } = await workflowFixture(); const emailId = randomUUID(), fileId = randomUUID();
+  const previous = globalThis.fetch;
+  globalThis.fetch = async url => String(url).includes("/attachments/") ? Response.json({ id: fileId, download_url: "https://attachments.example.com/file" }) : new Response("%PDF-1.7 fichier fictif");
+  try {
+    const email = { id: emailId, to: [siteReplyAddress(order, "reviews")], from: lead.email, subject: "Mes retours", text: "Changer la couleur", attachments: [{ id: fileId, filename: "plan.pdf", content_type: "application/pdf" }] };
+    await Promise.all([applySiteInbound(email), applySiteInbound(email)]);
+    assert.equal((await workflowData(order.id)).reviewRounds.length, 1);
+    const row = await db.siteInboundEmail.findUniqueOrThrow({ where: { providerId: emailId } }); assert.equal(row.state, "SUBMITTED");
+    const file = await storedInboundAttachment(row.id, fileId); assert.ok(file.bytes.toString().includes("fichier fictif"));
+    const adminView = await workflowData(order.id, true); assert.equal(adminView.inboundEmails.length, 1); assert.ok(!JSON.stringify(adminView).includes('"encrypted"'));
+    await applySiteInbound({ ...email, id: randomUUID(), text: "Un complément pendant les corrections", attachments: [] });
+    assert.equal(await db.siteInboundEmail.count({ where: { siteOrderId: order.id, state: "DEFERRED" } }), 1);
+    await applySiteInbound({ ...email, id: randomUUID(), from: "autre@example.com", attachments: [] });
+    assert.equal(await db.siteInboundEmail.count({ where: { siteOrderId: order.id, state: "UNVERIFIED_SENDER" } }), 1);
+    assert.equal((await workflowData(order.id)).reviewRounds[0].messages.length, 1);
+    await applySiteInbound({ ...email, id: randomUUID(), to: [siteReplyAddress(order, "domain")], attachments: [] });
+    assert.equal(await db.siteInboundEmail.count({ where: { siteOrderId: order.id, state: "DOMAIN_MESSAGE" } }), 1);
+    const ownerMails = await db.commercialEmail.count({ where: { siteOrderId: order.id, kind: "SITE_OWNER_NOTICE" } }); assert.equal(ownerMails, 4);
+  } finally { globalThis.fetch = previous; }
 });
 
 test("reprise d’activation : aucun abonnement actif relancé et anciens événements neutralisés", async () => {

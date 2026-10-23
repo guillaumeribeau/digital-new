@@ -7,6 +7,7 @@ import { CommercialError, paymentMode } from "./commercial-core";
 import { stripeClient } from "./commercial-payment";
 import { billingMoney, creationTtc } from "./site-billing-shared";
 import { queueSiteNotice, queueOwnerBillingNotice, storeBillingInvoice, syncSiteSubscription } from "./site-billing";
+import { queueDomainInvitation, queueReviewInvitation } from "./site-workflow-mail";
 
 export async function applySiteBillingEvent(event: Stripe.Event) {
   const mode = event.livemode ? "LIVE" : "TEST";
@@ -35,7 +36,17 @@ export async function applySiteBillingEvent(event: Stripe.Event) {
         await financialStage(tx, current.projectId, "PAID");
         await tx.siteOrder.update({ where: { id: current.id }, data: { status: "PAID", creationPaidAt: current.creationPaidAt || new Date(), paymentMethodId: method, stripeSessionId: session.id } });
       });
-      await queueSiteNotice(current.id, "CREATION_PAID", "Votre commande Zelyweb est confirmée", "Le paiement de la création est confirmé. Vous recevrez un prochain e-mail avec quelques questions pour préparer vos ajustements. Vous pourrez y répondre directement avec vos modifications. Trois séries de retours regroupés sont incluses dans les 30 jours suivant ce paiement : textes, photos, couleurs et présentation. Après validation des ajustements, vous recevrez un e-mail pour activer votre abonnement. La mise en ligne aura lieu sous 2 jours ouvrés après confirmation de son premier paiement, si le domaine est prêt.");
+      await queueSiteNotice(current.id, "CREATION_PAID", "Votre paiement Zelyweb est confirmé", `Le paiement de la création de ${billingMoney(creationTtc(current.creationHtCents))} TTC est confirmé. Votre suivi et vos factures sont accessibles depuis votre espace privé. Deux e-mails séparés vous invitent à transmettre votre première série de modifications et à choisir votre nom de domaine. L’abonnement sera activé par vos soins après validation du site.`);
+      await getDb().$transaction(async tx => {
+        await tx.$queryRaw`SELECT "id" FROM "SiteOrder" WHERE "id" = ${current.id}::uuid FOR UPDATE`;
+        const o = await tx.siteOrder.findUniqueOrThrow({ where: { id: current.id }, include: { project: { include: { lead: true } }, reviewRounds: true } });
+        // A delayed duplicate payment event must never invite a client back into an old series.
+        if (!o.reviewRounds.length && !o.finalApprovedAt && !o.subscriptionInviteSentAt) {
+          await queueReviewInvitation(tx, o, 0);
+          await tx.siteOrder.update({ where: { id: o.id }, data: { revisionEmailSentAt: o.revisionEmailSentAt || new Date() } });
+        }
+        await queueDomainInvitation(tx, o);
+      });
       await queueOwnerBillingNotice(current.id, "CREATION_PAID", "Création du site payée", `Le paiement de création de ${billingMoney(creationTtc(current.creationHtCents))} TTC est confirmé. Vous pouvez poursuivre les ajustements avec le client.`);
     }
   } else if (event.type === "payment_intent.payment_failed") {

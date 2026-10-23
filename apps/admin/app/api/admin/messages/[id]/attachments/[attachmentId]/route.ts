@@ -3,6 +3,7 @@ import { getDb } from "@nova/database";
 import { Resend } from "resend";
 import { z } from "zod";
 import { authenticate, AdminAccessError } from "../../../../../../../lib/access";
+import { receivingApiKey } from "../../../../../../../lib/site-inbound";
 export const runtime = "nodejs";
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string; attachmentId: string }> }) {
   try {
@@ -12,7 +13,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const files = z.array(z.object({ id: z.string(), filename: z.string() })).safeParse(message?.attachments);
     const file = files.success ? files.data.find((item) => item.id === attachmentId) : undefined;
     if (!file || !message?.providerId || message.direction !== "INBOUND" || !process.env.RESEND_API_KEY) return new Response(null, { status: 404 });
-    const attachment = await new Resend(process.env.RESEND_API_KEY).emails.receiving.attachments.get({ emailId: message.providerId, id: attachmentId });
+    const attachment = await new Resend(receivingApiKey()).emails.receiving.attachments.get({ emailId: message.providerId, id: attachmentId });
     if (attachment.error || !attachment.data) return new Response(null, { status: 503 });
     const url = new URL(attachment.data.download_url); if (url.protocol !== "https:") return new Response(null, { status: 503 });
     const response = await fetch(url, { signal: AbortSignal.timeout(10000), redirect: "error", cache: "no-store" });

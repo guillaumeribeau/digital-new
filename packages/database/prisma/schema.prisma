@@ -484,6 +484,7 @@ model SiteOrder {
   domainOptions         DomainOption[]
   domainSelection       DomainSelection?
   reviewRounds          ReviewRound[]
+  inboundEmails         SiteInboundEmail[]
   financialEvents       FinancialEvent[]
 }
 
@@ -666,6 +667,8 @@ model DomainSelection {
   selectedAt         DateTime @default(now()) @db.Timestamptz(3)
   purchasedAt        DateTime? @db.Timestamptz(3)
   renewalAt          DateTime? @db.Timestamptz(3)
+  renewalProposal    Json?
+  renewalHistory     Json @default("[]")
   supplementQuoteId  String? @db.Uuid
   order              SiteOrder @relation(fields: [siteOrderId], references: [id], onDelete: Restrict)
   option             DomainOption? @relation(fields: [optionId], references: [id], onDelete: Restrict)
@@ -675,12 +678,29 @@ model ReviewRound {
   id          String @id @default(uuid()) @db.Uuid
   siteOrderId String @db.Uuid
   number      Int
+  reviewVersion Int @default(1)
   status      String @default("OPEN") @db.VarChar(20)
   createdAt   DateTime @default(now()) @db.Timestamptz(3)
   closedAt    DateTime? @db.Timestamptz(3)
   order       SiteOrder @relation(fields: [siteOrderId], references: [id], onDelete: Restrict)
   messages    ReviewMessage[]
   @@unique([siteOrderId, number])
+}
+
+model SiteInboundEmail {
+  id            String @id @default(uuid()) @db.Uuid
+  siteOrderId   String @db.Uuid
+  providerId    String @unique @db.VarChar(200)
+  purpose       String @db.VarChar(20)
+  reviewVersion Int?
+  state         String @db.VarChar(30)
+  sender        String @db.VarChar(300)
+  subject       String @db.VarChar(300)
+  content       String @db.Text
+  attachments   Json @default("[]")
+  createdAt     DateTime @default(now()) @db.Timestamptz(3)
+  order         SiteOrder @relation(fields: [siteOrderId], references: [id], onDelete: Restrict)
+  @@index([siteOrderId, createdAt])
 }
 
 model ReviewMessage {

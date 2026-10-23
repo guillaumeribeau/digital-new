@@ -363,10 +363,10 @@ test("présentation, ajustements, domaines et invitation fonctionnent avec le co
     await adminWorkflow(h(), saved.id, { action: "options", options: [{ domain: "atelier-test.example.com", initialHtCents: 1500, renewalHtCents: 1500, recommended: true }] });
     const option = await db.domainOption.findFirstOrThrow({ where: { siteOrderId: saved.id } });
     await clientWorkflow(saved.id, { action: "domain", kind: "OPTION", optionId: option.id, agreement: true });
-    await clientWorkflow(saved.id, { action: "feedback", requestId: randomUUID(), message: "Remplacer le titre de présentation." });
+    await clientWorkflow(saved.id, { action: "feedback", version: 1, requestId: randomUUID(), message: "Remplacer le titre de présentation." });
     const round = await db.reviewRound.findFirstOrThrow({ where: { siteOrderId: saved.id } });
-    await adminWorkflow(h(), saved.id, { action: "close", roundId: round.id });
-    await clientWorkflow(saved.id, { action: "approve", version: 1, name: "Client Fictif", agreement: true });
+    await adminWorkflow(h(), saved.id, { action: "deliver", roundId: round.id, expectedVersion: 1, url: "https://preview.example.com/v2", requestId: randomUUID() });
+    await clientWorkflow(saved.id, { action: "approve", version: 2, name: "Client Fictif", agreement: true });
     await adminWorkflow(h(), saved.id, { action: "domain-ready" });
     const project = await runtime.project.findUniqueOrThrow({ where: { id } });
     await adminService.projectLinks(h(), { id, expectedUpdatedAt: project.updatedAt.toISOString(), previewUrl: project.previewUrl, websiteUrl: "https://atelier-test.example.com" });

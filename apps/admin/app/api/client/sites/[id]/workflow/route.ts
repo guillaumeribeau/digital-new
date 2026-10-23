@@ -19,7 +19,7 @@ export async function POST(r: NextRequest, { params }: { params: Promise<{ id: s
       const form = await new Response(Buffer.concat(chunks), { headers: { "Content-Type": r.headers.get("content-type")! } }).formData();
       const files = form.getAll("files").filter((v): v is File => v instanceof File && v.size > 0);
       if (files.length > 3) throw new CommercialError("INVALID_ACTION");
-      await clientWorkflow(id, { action: "feedback", requestId: form.get("requestId"), message: form.get("message") }, await Promise.all(files.map(async f => checkUpload(f.name, Buffer.from(await f.arrayBuffer())))));
+      await clientWorkflow(id, { action: "feedback", requestId: form.get("requestId"), message: form.get("message"), version: form.get("version") }, await Promise.all(files.map(async f => checkUpload(f.name, Buffer.from(await f.arrayBuffer())))));
     } else await clientWorkflow(id, await clientBody(r));
     return Response.json({ ok: true }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (e) { return commercialResponse(e); }

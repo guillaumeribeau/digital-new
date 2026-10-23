@@ -1,4 +1,4 @@
-import { chromium } from "@playwright/test";
+import { chromium, expect } from "@playwright/test";
 import { getDb } from "@nova/database";
 import { hashPassword } from "better-auth/crypto";
 import { randomUUID } from "node:crypto";
@@ -67,6 +67,44 @@ async function main() {
     await portal.screenshot({ path: "reports/billing/client-desktop.png", fullPage: true });
     // Simulated signed-payment outcome in this isolated database; no real Stripe call.
     await db.siteOrder.update({ where: { id: order.id }, data: { workflowVersion: 0, status: "PAID", creationPaidAt: new Date(), stripeCustomerId: "cus_ui_fixture" } });
+    await portal.setViewportSize({ width: 390, height: 844 });
+    for (let series = 1; series <= 3; series++) {
+      await portal.reload();
+      const feedback = portal.locator("#retours");
+      await feedback.getByRole("heading", { name: "Modifications du site", exact: true }).waitFor();
+      console.log("UI série", series, await feedback.innerText());
+      await portal.screenshot({ path: `reports/billing/serie-${series}-mobile.png`, fullPage: true });
+      await feedback.getByLabel("Mes modifications", { exact: true }).fill(`Série ${series} : corriger le texte de la page accueil.`);
+      await feedback.getByRole("checkbox", { name: "J’ai regroupé mes demandes", exact: false }).check();
+      await feedback.getByRole("button", { name: "Envoyer ma série de modifications" }).click();
+      await feedback.getByText("Vos demandes sont envoyées.", { exact: false }).waitFor();
+      await expect(feedback.getByRole("button", { name: "Envoyer ma série de modifications" })).toHaveCount(0);
+      assert.equal(await portal.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+      if (series === 1) await portal.screenshot({ path: "reports/billing/retours-attente-mobile.png", fullPage: true });
+      await page.reload();
+      const production = page.locator("#retours");
+      await production.getByLabel("Lien de la version corrigée").fill(`https://preview.example.com/version-${series + 1}`);
+      await production.getByRole("checkbox", { name: "J’ai terminé les corrections", exact: false }).check();
+      await production.getByRole("button", { name: "Terminer la série et envoyer la version corrigée" }).click();
+      await expect.poll(async () => (await db.siteOrder.findUniqueOrThrow({ where: { id: order.id } })).reviewVersion).toBe(series + 1);
+    }
+    await portal.reload();
+    await expect(portal.getByRole("button", { name: "Envoyer ma série de modifications" })).toHaveCount(0);
+    await portal.getByRole("heading", { name: "Une demande supplémentaire ?" }).waitFor();
+    await portal.getByRole("button", { name: "Nom de domaine", exact: true }).click();
+    const domainFlow = portal.locator("#domaine");
+    await domainFlow.getByRole("radio", { name: "Transmettre mon choix trouvé chez OVH", exact: false }).check();
+    await domainFlow.getByLabel("Nom de domaine", { exact: true }).fill("atelier-fictif.fr");
+    await domainFlow.getByRole("checkbox", { name: "Je confirme mon choix", exact: false }).check();
+    await domainFlow.getByRole("button", { name: "Transmettre mon choix de domaine" }).click();
+    await domainFlow.getByText("Choix reçu, tarifs à vérifier", { exact: false }).waitFor();
+    assert.equal(await portal.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+    await portal.screenshot({ path: "reports/billing/domaine-mobile.png", fullPage: true });
+    await portal.getByRole("button", { name: "Modifications du site", exact: true }).click();
+    await portal.locator("#retours").getByLabel("Votre nom", { exact: true }).fill("Camille Fictif");
+    await portal.locator("#retours").getByRole("checkbox", { name: "J’ai vérifié cette version", exact: false }).check();
+    await portal.locator("#retours").getByRole("button", { name: "Valider cette version", exact: true }).click();
+    await portal.getByText("Version validée par Camille Fictif", { exact: false }).waitFor();
     await page.reload();
     await card.getByRole("button", { name: "Prévisualiser l’e-mail d’ajustements" }).click();
     const revisions = card.frameLocator('iframe[title="Aperçu de l’e-mail d’ajustements"]');

@@ -2,6 +2,7 @@ import type { Client } from "pg";
 export async function grantCommercialPermissions(db: Client, admin: string, worker: string) {
   if (![admin, worker].every((name) => /^[a-z_][a-z0-9_]{0,62}$/i.test(name))) throw new Error("INVALID_RUNTIME_ROLE");
   const a = `"${admin}"`, w = `"${worker}"`;
+  await db.query(`GRANT SELECT, INSERT, UPDATE ON "SiteInboundEmail" TO ${a}`);
   await db.query(`GRANT SELECT, INSERT, UPDATE ON "TadapoOrder", "TadapoInvoice", "TadapoFeedback", "TadapoFile" TO ${a}`);
   await db.query(`GRANT INSERT ON "Lead" TO ${a}`);
   await db.query(`GRANT SELECT ("id", "projectId") ON "TadapoOrder" TO ${w}`);

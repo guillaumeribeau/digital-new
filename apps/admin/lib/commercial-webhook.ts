@@ -2,6 +2,7 @@ import { getDb } from "@nova/database";
 import { Resend } from "resend";
 import { z } from "zod";
 import { CommercialError } from "./commercial-core";
+import { applySiteInbound, receivingApiKey } from "./site-inbound";
 
 export async function boundedText(request: Pick<Request, "headers" | "body">, max = 1000000) {
   if (Number(request.headers.get("content-length") || 0) > max) throw new CommercialError("INVALID_ACTION");
@@ -22,11 +23,15 @@ export async function applyResendEvent(key: string, payload: ReturnType<Resend["
   const db = getDb(); if (await db.commercialWebhook.findUnique({ where: { key } })) return;
   if (payload.type === "email.received") {
     const emailId = z.uuid().parse(payload.data.email_id);
-    if (!process.env.RESEND_API_KEY) throw new CommercialError("CONFIGURATION_REQUIRED");
-    const response = await fetch(`https://api.resend.com/emails/receiving/${emailId}`, { headers: { Authorization: "Bearer " + process.env.RESEND_API_KEY }, signal: AbortSignal.timeout(10000), cache: "no-store" });
+    if (!receivingApiKey()) throw new CommercialError("CONFIGURATION_REQUIRED");
+    const response = await fetch(`https://api.resend.com/emails/receiving/${emailId}`, { headers: { Authorization: "Bearer " + receivingApiKey() }, signal: AbortSignal.timeout(10000), cache: "no-store" });
     if (!response.ok) throw new CommercialError("CONFIGURATION_REQUIRED");
     const email = inboundSchema.parse(JSON.parse(await boundedText(response)));
     if (email.id !== emailId) throw new CommercialError("INVALID_ACTION");
+    if (await applySiteInbound(email)) {
+      await db.commercialWebhook.upsert({ where: { key }, create: { key, provider: "RESEND" }, update: {} });
+      return;
+    }
     let target: string | undefined;
     for (const recipient of email.to) {
       const match = address(recipient).match(/^r-([a-f0-9]{48})@(.+)$/);

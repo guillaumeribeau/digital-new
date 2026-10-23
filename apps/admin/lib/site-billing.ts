@@ -10,6 +10,7 @@ import { stripeClient } from "./commercial-payment";
 import { billingAgreement, billingMoney, billingNoticeEmail, creationTtc, presentationEmail, subscriptionAgreement, subscriptionInvitationEmail, revisionRequestEmail } from "./site-billing-shared";
 import { queueOwnerNotification } from "./owner-notifications";
 import { business } from "@nova/shared/business";
+import { queueReviewInvitation } from "./site-workflow-mail";
 
 export const previewInput = z.object({
   projectId: z.uuid(), expectedVersion: z.coerce.number().int().min(0),
@@ -43,6 +44,11 @@ export async function resendCurrentSiteEmail(h: Headers, id: string, requestId: 
     if (await tx.commercialEmail.findUnique({ where: { manualRequestId: requestId } })) return;
     const o = await tx.siteOrder.findUniqueOrThrow({ where: { id }, include: { project: { include: { lead: true } } } }); modeCheck(o);
     if (o.status === "DRAFT" || o.firstSubscriptionPaidAt || o.project.lead.deletedAt || o.project.stage === "CANCELLED") throw new CommercialError("INVALID_ACTION");
+    if (o.creationPaidAt && !o.subscriptionInviteSentAt && o.workflowVersion) {
+      if (await tx.reviewRound.count({ where: { siteOrderId: id, OR: [{ status: "OPEN" }, { reviewVersion: { gte: o.reviewVersion } }] } })) throw new CommercialError("REVIEW_WAITING");
+      await queueReviewInvitation(tx, o, await tx.reviewRound.count({ where: { siteOrderId: id } }), requestId);
+      return;
+    }
     const kind = o.subscriptionInviteSentAt ? "SITE_SUBSCRIPTION_INVITE" : o.creationPaidAt && o.revisionEmailSentAt ? "SITE_REVISION_REQUEST" : !o.creationPaidAt ? "SITE_PRESENTATION" : null;
     if (!kind) throw new CommercialError("INVALID_ACTION");
     if (await tx.commercialEmail.findFirst({ where: { kind, status: { in: ["PENDING", "PROCESSING"] }, OR: [{ siteOrderId: id }, { siteOrderId: null }] } })) throw new CommercialError("REMINDER_PENDING");
