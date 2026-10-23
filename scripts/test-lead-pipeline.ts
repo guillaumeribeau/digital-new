@@ -73,21 +73,24 @@ async function main() {
     await run(["--import", "tsx", "--test", "tests/integration/admin.test.ts"], env);
     await run(["--import", "tsx", "--test", "tests/integration/commercial.test.ts"], env);
     await run(["--import", "tsx", "--test", "tests/integration/site-billing.test.ts"], env);
-    if (process.argv.includes("--ui") || process.argv.includes("--commercial-ui") || process.argv.includes("--trash-ui") || process.argv.includes("--billing-ui") || process.argv.includes("--operations-ui")) {
+    await run(["--import", "tsx", "--test", "tests/integration/tadapo.test.ts"], env);
+    if (process.argv.includes("--tadapo-ui") || process.argv.includes("--ui") || process.argv.includes("--commercial-ui") || process.argv.includes("--trash-ui") || process.argv.includes("--billing-ui") || process.argv.includes("--operations-ui")) {
       const adminPort = await freePort(), websitePort = await freePort();
       const uiEnv: NodeJS.ProcessEnv & { BETTER_AUTH_URL: string; NEXT_PUBLIC_SITE_URL: string } = { ...env, BETTER_AUTH_URL: `http://127.0.0.1:${adminPort}`, NEXT_PUBLIC_SITE_URL: `http://127.0.0.1:${websitePort}`, NEXT_PUBLIC_GTM_ID: "", NEXT_TELEMETRY_DISABLED: "1" };
       Object.assign(uiEnv, { LEAD_EMAIL_MODE: "local", LOCAL_EMAIL_PREVIEW_TOKEN: randomBytes(32).toString("hex") });
       Object.assign(uiEnv, { COMMERCIAL_PUBLIC_URL: uiEnv.BETTER_AUTH_URL });
+      if (process.argv.includes("--tadapo-ui")) Object.assign(uiEnv, { NEXT_PUBLIC_TADAPO_SITE_URL: uiEnv.NEXT_PUBLIC_SITE_URL, STRIPE_SECRET_KEY: "sk_test_tadapo_ui_fixture", TADAPO_FROM_EMAIL: "Tadapo <contact@tadapo.test>", TADAPO_CONTACT_EMAIL: "contact@tadapo.test" });
       if (process.argv.includes("--billing-ui")) uiEnv.STRIPE_SECRET_KEY = "sk_test_billing_ui_fixture";
-      const nextEnv: NodeJS.ProcessEnv = { ...uiEnv, NODE_ENV: "development", NOVA_UI_TEST: "1" };
+      const nextEnv: NodeJS.ProcessEnv = { ...uiEnv, NODE_ENV: "development", NOVA_UI_TEST: "1", TADAPO_UI_TEST: "1" };
       const servers: ChildProcess[] = [];
-      const generatedFiles = ["apps/admin/tsconfig.json", "apps/admin/next-env.d.ts", "apps/website/tsconfig.json", "apps/website/next-env.d.ts"];
+      const generatedFiles = ["apps/admin/tsconfig.json", "apps/admin/next-env.d.ts", "apps/website/tsconfig.json", "apps/website/next-env.d.ts", "apps/tadapo/tsconfig.json", "apps/tadapo/next-env.d.ts"];
       const previousFiles = await Promise.all(generatedFiles.map(async (file) => ({ file, text: await readFile(file, "utf8") })));
       try {
         servers.push(spawn(process.execPath, ["node_modules/next/dist/bin/next", "dev", "apps/admin", "--hostname", "127.0.0.1", "--port", String(adminPort)], { env: nextEnv, windowsHide: true, stdio: "inherit" }));
-        servers.push(spawn(process.execPath, ["node_modules/next/dist/bin/next", "dev", "apps/website", "--hostname", "127.0.0.1", "--port", String(websitePort)], { env: nextEnv, windowsHide: true, stdio: "inherit" }));
+        servers.push(spawn(process.execPath, ["node_modules/next/dist/bin/next", "dev", process.argv.includes("--tadapo-ui") ? "apps/tadapo" : "apps/website", "--hostname", "127.0.0.1", "--port", String(websitePort)], { env: nextEnv, windowsHide: true, stdio: "inherit" }));
         await Promise.all([ready(uiEnv.BETTER_AUTH_URL + "/connexion"), ready(uiEnv.NEXT_PUBLIC_SITE_URL + "/")]);
-        if (process.argv.includes("--billing-ui")) await run(["--import", "tsx", "scripts/check-site-billing-ui.ts"], uiEnv);
+        if (process.argv.includes("--tadapo-ui")) await run(["--import", "tsx", "scripts/check-tadapo-admin-ui.ts"], uiEnv);
+        else if (process.argv.includes("--billing-ui")) await run(["--import", "tsx", "scripts/check-site-billing-ui.ts"], uiEnv);
         else if (process.argv.includes("--operations-ui")) await run(["--import", "tsx", "scripts/check-operations-ui.ts"], uiEnv);
         else if (process.argv.includes("--trash-ui")) await run(["--import", "tsx", "scripts/check-lead-trash-ui.ts"], uiEnv);
         else {

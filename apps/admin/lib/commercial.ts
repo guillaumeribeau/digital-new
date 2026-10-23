@@ -28,11 +28,11 @@ export async function buildSnapshot(quote: Quote) {
   return result.data;
 }
 export const commercialService = {
-  async clients(headers: Headers, q = "", page = 1) {
+  async clients(headers: Headers, q = "", page = 1, brand = "") {
     await authenticate(headers); q = z.string().max(200).parse(q); page = z.number().int().min(1).max(100000).parse(page);
-    const where: Prisma.LeadWhereInput = { deletedAt: null, ...(q ? { OR: ["businessName", "fullName", "email"].map((field) => ({ [field]: { contains: q, mode: "insensitive" } })) } : {}) };
+    const where: Prisma.LeadWhereInput = { deletedAt: null, ...(["zelyweb", "tadapo"].includes(brand) ? { brand } : {}), ...(q ? { OR: ["businessName", "fullName", "email"].map((field) => ({ [field]: { contains: q, mode: "insensitive" } })) } : {}) };
     const [rows, count] = await getDb().$transaction([getDb().lead.findMany({ where, orderBy: { createdAt: "desc" }, take: 20, skip: (page - 1) * 20,
-      select: { id: true, businessName: true, fullName: true, email: true, emailVerifiedAt: true, conversation: { select: { needsReply: true } }, _count: { select: { quotes: true } } } }), getDb().lead.count({ where })]);
+      select: { id: true, brand: true, project: { select: { id: true } }, businessName: true, fullName: true, email: true, emailVerifiedAt: true, conversation: { select: { needsReply: true } }, _count: { select: { quotes: true } } } }), getDb().lead.count({ where })]);
     return { rows, count };
   },
   async client(headers: Headers, id: string) {

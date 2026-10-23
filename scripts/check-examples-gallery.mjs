@@ -22,7 +22,7 @@ for (const width of [375, 768, 1024, 1440]) {
   });
   assert.equal(response.status(), 200);
   await page.addStyleTag({ content: "nextjs-portal{display:none!important}" });
-  assert.equal(await page.locator(".portfolio-project").count(), 9);
+  assert.equal(await page.locator(".portfolio-project").count(), 14);
   await page.evaluate(async () => {
     for (let y = 0; y < document.documentElement.scrollHeight; y += 800) {
       window.scrollTo(0, y);
@@ -49,16 +49,33 @@ for (const width of [375, 768, 1024, 1440]) {
     path: "reports/examples/gallery-top-" + width + ".png",
   });
   for (const [name, count] of [
-    ["Artisanat", 3],
-    ["Commerce", 2],
-    ["Indépendants", 2],
-    ["Professions libérales", 1],
+    ["Artisanat", 4],
+    ["Commerce", 3],
+    ["Indépendants", 4],
+    ["Professions libérales", 2],
     ["Associations", 1],
-    ["Tous", 9],
+    ["Tous", 14],
   ]) {
     await page.getByRole("button", { name, exact: true }).click();
     assert.equal(await page.locator(".portfolio-project").count(), count);
   }
+  await page.getByLabel("Rechercher un métier").fill("electricien");
+  assert.equal(await page.locator(".portfolio-project").count(), 1);
+  await page.getByLabel("Ambiance", { exact: true }).selectOption("dark");
+  assert.equal(await page.locator(".portfolio-project").count(), 0);
+  await page.getByRole("button", { name: "Réinitialiser", exact: true }).click();
+  await page.getByLabel("Ambiance", { exact: true }).selectOption("dark");
+  assert.equal(await page.locator(".portfolio-project").count(), 4);
+  await page.getByRole("button", { name: "Réinitialiser", exact: true }).click();
+  await page.getByLabel("Trier par", { exact: true }).selectOption("newest");
+  assert.equal(await page.locator(".portfolio-project h3").first().innerText(), "Adresse Singulière");
+  await page.getByLabel("Trier par", { exact: true }).selectOption("name");
+  const names = await page.locator(".portfolio-project h3").allTextContents();
+  assert.deepEqual(names, [...names].sort((a,b) => a.localeCompare(b,"fr")));
+  await page.getByLabel("Trier par", { exact: true }).selectOption("sector");
+  const sectors = await page.locator(".portfolio-sector").allTextContents();
+  assert.deepEqual(sectors, [...sectors].sort((a,b) => a.localeCompare(b,"fr")));
+  await page.getByRole("button", { name: "Réinitialiser", exact: true }).click();
   await page
     .getByRole("link", {
       name: "Explorer le site de démonstration Atelier Martin Plomberie",
@@ -75,6 +92,8 @@ for (const width of [375, 768, 1024, 1440]) {
   results.push({
     width,
     filters: true,
+    search: true,
+    sorting: true,
     photos: true,
     navigation: true,
     overflow: false,
@@ -88,5 +107,5 @@ await writeFile(
 );
 await browser.close();
 console.log(
-  "Galerie : 4 largeurs, 6 filtres, navigation et captures chargées — OK.",
+  "Galerie : 4 largeurs, filtres, recherche, classements, navigation et captures chargées — OK.",
 );

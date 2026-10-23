@@ -4,7 +4,7 @@ import nextTs from "eslint-config-next/typescript";
 export default defineConfig([
   ...nextVitals,
   ...nextTs,
-  { settings: { next: { rootDir: ["apps/website/", "apps/admin/"] } } },
+  { settings: { next: { rootDir: ["apps/website/", "apps/admin/", "apps/tadapo/"] } } },
   globalIgnores([
     ".next/**",
     "**/.next/**",

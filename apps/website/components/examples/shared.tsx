@@ -10,6 +10,7 @@ import {
   UtensilsCrossed,
   Aperture,
   Sparkles,
+  Zap, Brush, Dumbbell, Wheat, House,
 } from "lucide-react";
 import { DemoMenu } from "./demo-menu";
 import { DemoForm } from "./demo-form";
@@ -24,6 +25,11 @@ const icons = {
   restaurant: UtensilsCrossed,
   photographe: Aperture,
   automobile: Sparkles,
+  electricien: Zap,
+  nettoyage: Brush,
+  "coach-sportif": Dumbbell,
+  boulangerie: Wheat,
+  immobilier: House,
 };
 export function DemoLogo({ slug }: { slug: ExampleSlug }) {
   const e = examples.find((e) => e.slug === slug)!;
@@ -156,7 +162,7 @@ export function DemoContact({
                         : slug === "restaurant" ? "atelier-braises"
                           : slug === "photographe" ? "noe-laurent"
                             : slug === "automobile" ? "atelier-minuit"
-                              : "ensemble-demain"}
+                              : slug === "association" ? "ensemble-demain" : slug}
               .example
               <br />
               00 00 00 00 00 · numéro non actif

@@ -104,7 +104,7 @@ test("le brief simplifié accepte un contact par email sans téléphone ni conte
     false,
   );
 });
-test("les neuf inspirations sont acceptées sans rendre les anciens contenus obligatoires", () => {
+test("les quatorze inspirations sont acceptées sans rendre les anciens contenus obligatoires", () => {
   for (const style of [
     "plombier",
     "paysagiste",
@@ -115,6 +115,7 @@ test("les neuf inspirations sont acceptées sans rendre les anciens contenus obl
     "restaurant",
     "photographe",
     "automobile",
+    "electricien", "nettoyage", "coach-sportif", "boulangerie", "immobilier",
     "propose",
   ]) {
     const {

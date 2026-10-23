@@ -6,9 +6,10 @@ import { getDb, PrismaClient } from "@nova/database";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { hashPassword } from "better-auth/crypto";
 import { PDFDocument } from "pdf-lib";
+import sharp from "sharp";
 import { Client } from "pg";
 import { commercialService, buildSnapshot } from "../../apps/admin/lib/commercial";
-import { commercialLocal, CommercialError, digest, unseal, snapshotSchema } from "../../apps/admin/lib/commercial-core";
+import { commercialLocal, CommercialError, digest, seal, unseal, snapshotSchema } from "../../apps/admin/lib/commercial-core";
 import { quotePdf } from "../../apps/admin/lib/quote-pdf";
 import { stripeClient, checkoutQuote } from "../../apps/admin/lib/commercial-payment";
 import { processCommercialOutbox, queueQuoteReminder } from "../../apps/admin/lib/commercial-mail";
@@ -19,7 +20,10 @@ import { GET as clientGet, POST as clientPost } from "../../apps/admin/app/api/c
 import { POST as stripeWebhook } from "../../apps/admin/app/api/webhooks/stripe/route";
 import { POST as resendWebhook } from "../../apps/admin/app/api/webhooks/resend/route";
 import { leadRepository } from "../../apps/website/lib/lead-repository";
-import { decryptPayload } from "../../apps/website/lib/lead-security";
+import { decryptPayload, encryptPayload } from "../../apps/website/lib/lead-security";
+import { processOutbox } from "../../apps/website/lib/outbox";
+import { saveSitePresentation, sendSitePresentation, prepareRevisionEmail, sendRevisionEmail, prepareSiteSubscription, sendSiteSubscription } from "../../apps/admin/lib/site-billing";
+import { adminWorkflow, clientWorkflow } from "../../apps/admin/lib/project-workflow";
 import { leadSchema } from "@nova/validation";
 import { adminService } from "../../apps/admin/lib/service";
 import { grantCommercialPermissions } from "../../scripts/commercial-permissions";
@@ -232,5 +236,179 @@ test("les opérations commerciales fonctionnent avec le rôle PostgreSQL restrei
     await commercialService.message(h(), { leadId, requestId: randomUUID(), subject: "Test droits runtime", content: "Message fictif avec droits restreints." });
     const id = await commercialService.createQuote(h(), draft()); await commercialService.sendQuote(h(), id);
     assert.equal((await commercialService.quote(h(), id))?.status, "SENT");
+  } finally { shared.leadPrisma = previous; await runtime.$disconnect(); }
+});
+
+test("le worker restreint envoie une proposition sans accéder aux données privées de la commande", async () => {
+  const password = randomBytes(24).toString("base64url");
+  const operator = new Client({ connectionString: process.env.DATABASE_URL });
+  await operator.connect();
+  await operator.query(`CREATE ROLE commercial_runtime_worker LOGIN PASSWORD '${password}' NOSUPERUSER NOCREATEDB NOCREATEROLE`);
+  await operator.query('GRANT USAGE ON SCHEMA public TO commercial_runtime_worker');
+  await grantCommercialPermissions(operator, "commercial_test_admin", "commercial_runtime_worker");
+  const order = await db.siteOrder.create({ data: { projectId, status: "SENT", mode: "TEST", previewUrl: "https://preview.example.com", screenshot: "fixture", message: "Proposition de contrôle", tokenHash: digest(randomUUID()), tokenEncrypted: seal("private-test-token") } });
+  // Keep the test focused on this proposal in the isolated test database.
+  await db.commercialEmail.updateMany({ where: { status: { in: ["PENDING", "PROCESSING"] } }, data: { status: "CANCELLED" } });
+  const mail = await db.commercialEmail.create({ data: { siteOrderId: order.id, kind: "SITE_PRESENTATION", expiresAt: new Date(Date.now() + 3600000), payloadEncrypted: seal({ from: "Test <sender@example.com>", to: ["recipient@example.com"], subject: "Proposition fictive", text: "Aucun envoi réel." }) } });
+  const url = new URL(process.env.DATABASE_URL!); url.username = "commercial_runtime_worker"; url.password = password;
+  const runtime = new PrismaClient({ adapter: new PrismaPg({ connectionString: url.href, max: 3, connectionTimeoutMillis: 5000 }) });
+  const shared = globalThis as unknown as { leadPrisma: PrismaClient };
+  const previous = shared.leadPrisma, previousMode = process.env.COMMERCIAL_MODE;
+  let calls = 0;
+  globalThis.fetch = async (_url, init) => {
+    calls++;
+    assert.equal(new Headers(init?.headers).get("idempotency-key"), "nova-commercial/" + mail.id);
+    return Response.json({ id: "test-worker-proposal" });
+  };
+  process.env.COMMERCIAL_MODE = "";
+  shared.leadPrisma = runtime;
+  try {
+    // Reproduce the old permissions: it fails before contacting Resend.
+    await operator.query('REVOKE SELECT ("id", "projectId", "creationPaidAt", "firstSubscriptionPaidAt") ON "SiteOrder" FROM commercial_runtime_worker');
+    assert.deepEqual(await processCommercialOutbox(1), { sent: 0, failed: 1 });
+    assert.equal(calls, 0);
+    assert.equal((await db.commercialEmail.findUniqueOrThrow({ where: { id: mail.id } })).lastError, "EMAIL_STATE_CHECK_FAILED");
+    await grantCommercialPermissions(operator, "commercial_test_admin", "commercial_runtime_worker");
+    await db.commercialEmail.update({ where: { id: mail.id }, data: { availableAt: new Date(0) } });
+    assert.deepEqual(await processCommercialOutbox(1), { sent: 1, failed: 0 });
+    const delivered = await db.commercialEmail.findUniqueOrThrow({ where: { id: mail.id } });
+    assert.equal(delivered.status, "SENT");
+    assert.equal(delivered.lastError, null);
+    assert.equal(calls, 1);
+    // The check grants no access to payment tokens, client contact details or mutations.
+    await assert.rejects(runtime.siteOrder.findUniqueOrThrow({ where: { id: order.id } }));
+    await assert.rejects(runtime.lead.findUniqueOrThrow({ where: { id: leadId }, select: { email: true } }));
+    await assert.rejects(runtime.project.update({ where: { id: projectId }, data: { stage: "CANCELLED" } }));
+
+    // Exercise the remaining commercial mail branches with the same restricted worker.
+    globalThis.fetch = async () => Response.json({ id: randomUUID() });
+    const payload = { from: "Test <sender@example.com>", to: ["recipient@example.com"], subject: "Contrôle des droits", text: "Message fictif sans envoi réel." };
+    const expiresAt = new Date(Date.now() + 3600000);
+    const activeQuote = await db.quote.findFirstOrThrow({ where: { status: "SENT" }, orderBy: { createdAt: "desc" } });
+    const message = await db.clientMessage.findFirstOrThrow({ where: { direction: "OUTBOUND" } });
+    for (const data of [
+      { kind: "SITE_REVISION_REQUEST", siteOrderId: order.id },
+      { kind: "SITE_SUBSCRIPTION_INVITE", siteOrderId: order.id },
+      { kind: "SITE_OWNER_NOTICE", siteOrderId: order.id },
+      { kind: "QUOTE", quoteId: activeQuote.id },
+      { kind: "REMINDER", quoteId: activeQuote.id },
+      { kind: "MESSAGE", messageId: message.id },
+    ]) {
+      const queued = await db.commercialEmail.create({ data: { ...data, expiresAt, payloadEncrypted: seal(payload) } });
+      assert.deepEqual(await processCommercialOutbox(1), { sent: 1, failed: 0 }, data.kind);
+      assert.equal((await db.commercialEmail.findUniqueOrThrow({ where: { id: queued.id } })).status, "SENT", data.kind);
+    }
+    assert.equal((await db.clientMessage.findUniqueOrThrow({ where: { id: message.id } })).deliveryStatus, "SENT");
+
+    // Obsolete proposals are cancelled without calling the provider.
+    let unexpectedCalls = 0;
+    globalThis.fetch = async () => { unexpectedCalls++; throw new Error("Provider must not be called"); };
+    await db.siteOrder.update({ where: { id: order.id }, data: { creationPaidAt: new Date(), firstSubscriptionPaidAt: new Date() } });
+    for (const kind of ["SITE_PRESENTATION", "SITE_SUBSCRIPTION_INVITE"]) {
+      const obsolete = await db.commercialEmail.create({ data: { siteOrderId: order.id, kind, expiresAt, payloadEncrypted: seal(payload) } });
+      assert.deepEqual(await processCommercialOutbox(1), { sent: 0, failed: 0 });
+      assert.equal((await db.commercialEmail.findUniqueOrThrow({ where: { id: obsolete.id } })).status, "CANCELLED");
+    }
+    assert.equal(unexpectedCalls, 0);
+
+    // Public confirmation, receipt and internal notification use another outbox.
+    await operator.query('GRANT SELECT, UPDATE ON "OutboxEvent" TO commercial_runtime_worker');
+    await db.outboxEvent.updateMany({ where: { status: { in: ["PENDING", "PROCESSING"] } }, data: { status: "CANCELLED" } });
+    globalThis.fetch = async () => Response.json({ id: randomUUID() });
+    for (const kind of ["VERIFY_EMAIL", "RECEIPT", "INTERNAL_NOTIFICATION"] as const) {
+      const queued = await db.outboxEvent.create({ data: { leadId, kind, expiresAt, payloadEncrypted: encryptPayload(payload) } });
+      assert.deepEqual(await processOutbox(1), { sent: 1, failed: 0 }, kind);
+      const sent = await db.outboxEvent.findUniqueOrThrow({ where: { id: queued.id } });
+      assert.equal(sent.status, "SENT");
+      assert.equal(sent.payloadEncrypted, null);
+    }
+  } finally {
+    shared.leadPrisma = previous;
+    process.env.COMMERCIAL_MODE = previousMode;
+    globalThis.fetch = originalFetch;
+    await runtime.$disconnect();
+    await operator.end();
+  }
+});
+
+test("présentation, ajustements, domaines et invitation fonctionnent avec le compte admin restreint", async () => {
+  const source = await db.lead.findUniqueOrThrow({ where: { id: leadId } });
+  const lead = await db.lead.create({ data: { ...source, id: randomUUID(), requestId: randomUUID(), status: "QUALIFIED" } });
+  const password = randomBytes(24).toString("base64url"), operator = new Client({ connectionString: process.env.DATABASE_URL });
+  await operator.connect();
+  await operator.query(`CREATE ROLE billing_runtime_admin LOGIN PASSWORD '${password}' NOSUPERUSER NOCREATEDB NOCREATEROLE`);
+  await operator.query('GRANT USAGE ON SCHEMA public TO billing_runtime_admin');
+  await operator.query('GRANT SELECT ON "Lead", "LeadFile", "AdminUser", auth_user, auth_session TO billing_runtime_admin');
+  await operator.query('GRANT UPDATE ("status", "updatedAt", "deletedAt") ON "Lead" TO billing_runtime_admin');
+  await operator.query('GRANT SELECT, INSERT, UPDATE ON "Project" TO billing_runtime_admin');
+  await operator.query('GRANT SELECT, INSERT ON "ActivityLog", "InternalNote" TO billing_runtime_admin');
+  await grantCommercialPermissions(operator, "billing_runtime_admin", "commercial_test_worker");
+  await operator.end();
+  const url = new URL(process.env.DATABASE_URL!); url.username = "billing_runtime_admin"; url.password = password;
+  const runtime = new PrismaClient({ adapter: new PrismaPg({ connectionString: url.href, max: 3, connectionTimeoutMillis: 5000 }) });
+  const shared = globalThis as unknown as { leadPrisma: PrismaClient }, previous = shared.leadPrisma;
+  const previousStripeKey = process.env.STRIPE_SECRET_KEY;
+  process.env.STRIPE_SECRET_KEY = "sk_test_billing_permissions_fixture";
+  shared.leadPrisma = runtime;
+  try {
+    const id = await adminService.convert(h(), lead.id);
+    await adminService.note(h(), { id, kind: "project", content: "Note interne de contrôle des droits." });
+    const image = await sharp({ create: { width: 8, height: 8, channels: 3, background: "#2454ff" } }).jpeg().toBuffer();
+    const saved = await saveSitePresentation(h(), { projectId: id, expectedVersion: 0, previewUrl: "https://preview.example.com", message: "Votre proposition fictive est prête.", creationPrice: "299,00", screenshot: "data:image/jpeg;base64," + image.toString("base64") });
+    await sendSitePresentation(h(), saved.id, saved.version);
+    // Simulate a payment already verified by Stripe; the real webhook has its own tests.
+    await db.siteOrder.update({ where: { id: saved.id }, data: { status: "PAID", creationPaidAt: new Date(), stripeCustomerId: "cus_permissions_fixture" } });
+    const revisions = await prepareRevisionEmail(h(), saved.id, "Merci de regrouper vos ajustements dans votre espace privé.");
+    await sendRevisionEmail(h(), saved.id, revisions.version);
+    await adminWorkflow(h(), saved.id, { action: "options", options: [{ domain: "atelier-test.example.com", initialHtCents: 1500, renewalHtCents: 1500, recommended: true }] });
+    const option = await db.domainOption.findFirstOrThrow({ where: { siteOrderId: saved.id } });
+    await clientWorkflow(saved.id, { action: "domain", kind: "OPTION", optionId: option.id, agreement: true });
+    await clientWorkflow(saved.id, { action: "feedback", requestId: randomUUID(), message: "Remplacer le titre de présentation." });
+    const round = await db.reviewRound.findFirstOrThrow({ where: { siteOrderId: saved.id } });
+    await adminWorkflow(h(), saved.id, { action: "close", roundId: round.id });
+    await clientWorkflow(saved.id, { action: "approve", version: 1, name: "Client Fictif", agreement: true });
+    await adminWorkflow(h(), saved.id, { action: "domain-ready" });
+    const project = await runtime.project.findUniqueOrThrow({ where: { id } });
+    await adminService.projectLinks(h(), { id, expectedUpdatedAt: project.updatedAt.toISOString(), previewUrl: project.previewUrl, websiteUrl: "https://atelier-test.example.com" });
+    const invitation = await prepareSiteSubscription(h(), saved.id);
+    await sendSiteSubscription(h(), saved.id, invitation.version);
+    assert.ok((await db.siteOrder.findUniqueOrThrow({ where: { id: saved.id } })).subscriptionInviteSentAt);
+    assert.equal(await db.commercialEmail.count({ where: { siteOrderId: saved.id, kind: { in: ["SITE_PRESENTATION", "SITE_REVISION_REQUEST", "SITE_SUBSCRIPTION_INVITE"] } } }), 3);
+    assert.ok(await runtime.serviceHeartbeat.count() >= 0);
+    assert.equal((await runtime.activityLog.count({ where: { projectId: id } })) > 0, true);
+    await assert.rejects(runtime.lead.update({ where: { id: lead.id }, data: { email: "forbidden@example.com" } }));
+    await assert.rejects(runtime.activityLog.deleteMany({ where: { projectId: id } }));
+  } finally {
+    shared.leadPrisma = previous;
+    if (previousStripeKey === undefined) delete process.env.STRIPE_SECRET_KEY;
+    else process.env.STRIPE_SECRET_KEY = previousStripeKey;
+    await runtime.$disconnect();
+  }
+});
+
+test("le compte web restreint enregistre et confirme une demande sans accès aux tables privées", async () => {
+  const password = randomBytes(24).toString("base64url"), operator = new Client({ connectionString: process.env.DATABASE_URL });
+  await operator.connect();
+  try {
+    await operator.query(`CREATE ROLE public_runtime_web LOGIN PASSWORD '${password}' NOSUPERUSER NOCREATEDB NOCREATEROLE`);
+    await operator.query('GRANT USAGE ON SCHEMA public TO public_runtime_web');
+    await operator.query('GRANT SELECT, INSERT ON "Lead" TO public_runtime_web');
+    await operator.query('GRANT UPDATE ("status", "emailVerifiedAt", "updatedAt") ON "Lead" TO public_runtime_web');
+    await operator.query('GRANT SELECT, INSERT, UPDATE ON "EmailVerificationToken", "OutboxEvent" TO public_runtime_web');
+  } finally { await operator.end(); }
+  const url = new URL(process.env.DATABASE_URL!); url.username = "public_runtime_web"; url.password = password;
+  const runtime = new PrismaClient({ adapter: new PrismaPg({ connectionString: url.href, max: 3, connectionTimeoutMillis: 5000 }) });
+  const shared = globalThis as unknown as { leadPrisma: PrismaClient }, previous = shared.leadPrisma;
+  shared.leadPrisma = runtime;
+  try {
+    const submitted = await leadRepository.submit(leadSchema.parse({ company: "Test droits site", sector: "Artisanat", city: "Ville Test", services: "Prestations fictives", style: "propose", fullName: "Client Test", email: "permissions-web@example.com", contactMethod: "email", consent: true, pricingAcknowledged: true, honeypot: "", requestId: randomUUID() }));
+    const event = await db.outboxEvent.findFirstOrThrow({ where: { leadId: submitted.reference, kind: "VERIFY_EMAIL" } });
+    const payload = decryptPayload(event.payloadEncrypted!) as { text: string };
+    await leadRepository.verify(payload.text.match(/#token=([A-Za-z0-9_-]+)/)![1]);
+    assert.equal((await db.lead.findUniqueOrThrow({ where: { id: submitted.reference } })).status, "NEW");
+    assert.equal(await db.outboxEvent.count({ where: { leadId: submitted.reference, kind: { in: ["RECEIPT", "INTERNAL_NOTIFICATION"] } } }), 2);
+    await assert.rejects(runtime.siteOrder.findMany());
+    await assert.rejects(runtime.user.findMany());
+    await assert.rejects(runtime.lead.update({ where: { id: submitted.reference }, data: { deletedAt: new Date() } }));
   } finally { shared.leadPrisma = previous; await runtime.$disconnect(); }
 });

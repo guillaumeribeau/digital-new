@@ -17,6 +17,7 @@
     "isolatedModules": true,
     "jsx": "react-jsx",
     "paths": {
+      "@tadapo/*": ["./apps/tadapo/*"],
       "@/*": [
         "./apps/website/*"
       ]

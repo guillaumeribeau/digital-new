@@ -12,6 +12,12 @@
   "scripts": {
     "dev": "next dev apps/website",
     "dev:admin": "next dev apps/admin --port 3001",
+    "dev:tadapo": "next dev apps/tadapo --port 3002",
+    "build:tadapo": "npm run build --workspace @nova/tadapo",
+    "start:tadapo": "next start apps/tadapo",
+    "typecheck:tadapo": "tsc --noEmit --project apps/tadapo/tsconfig.json",
+    "test:tadapo": "tsx --test tests/tadapo.test.ts",
+    "test:tadapo-ui": "node scripts/check-tadapo.mjs",
     "build": "prisma generate && npm run build --workspaces --if-present",
     "build:website": "prisma generate && npm run build --workspace @nova/website",
     "build:admin": "prisma generate && npm run build --workspace @nova/admin",

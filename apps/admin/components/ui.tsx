@@ -30,9 +30,9 @@ export function Pagination({ page, pages, total, query, path }: { page: number; 
     {page < pages && <Link className="button secondary small" href={href(page + 1)}>Suivant<ChevronRight size={15} /></Link>}
   </div></div>;
 }
-export function Filters({ statuses, query, path }: { statuses: Record<string, string>; query: { q: string; status: string; sort: string; view?: string }; path: string }) {
+export function Filters({ statuses, query, path }: { statuses: Record<string, string>; query: { q: string; status: string; sort: string; view?: string; brand?: string }; path: string }) {
   return <form className="filters" action={path}>{query.view === "trash" && <input type="hidden" name="view" value="trash" />}<div className="search-field"><label htmlFor="q">Rechercher</label><input id="q" name="q" placeholder="Entreprise, contact, activité…" defaultValue={query.q} maxLength={200} /></div>
-    <div><label htmlFor="status">Statut</label><select id="status" name="status" defaultValue={query.status}><option value="">Tous les statuts</option>{Object.entries(statuses).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></div>
+    <div><label htmlFor="brand">Marque</label><select id="brand" name="brand" defaultValue={query.brand || ""}><option value="">Toutes les marques</option><option value="zelyweb">Zelyweb</option><option value="tadapo">Tadapo</option></select></div><div><label htmlFor="status">Statut</label><select id="status" name="status" defaultValue={query.status}><option value="">Tous les statuts</option>{Object.entries(statuses).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></div>
     <div><label htmlFor="sort">Date de réception</label><select id="sort" name="sort" defaultValue={query.sort}><option value="desc">Plus récentes</option><option value="asc">Plus anciennes</option></select></div>
     <button className="button" type="submit">Appliquer</button><Link className="text-link" href={path + (query.view === "trash" ? "?view=trash" : "")}>Réinitialiser</Link>
   </form>;

@@ -12,6 +12,8 @@ import { Gallery } from "./gallery";
 import { Pricing } from "./pricing";
 import { FAQList } from "./faq-list";
 import { FinalCTA } from "./final-cta";
+import { Testimonials } from "./testimonials";
+import { examples } from "@/lib/examples";
 export function HomeContent() {
   return (
     <>
@@ -168,14 +170,14 @@ export function HomeContent() {
           <Gallery compact />
           <div className="nh-gallery-end">
             <p>
-              Neuf univers à découvrir.
+              {examples.length} univers à découvrir.
               <br />
               <span>
                 Des exemples fictifs, construits comme de vrais sites.
               </span>
             </p>
             <Link className="button dark" href="/exemples">
-              Explorer les 9 exemples <ArrowUpRight size={19} />
+              Explorer les {examples.length} exemples <ArrowUpRight size={19} />
             </Link>
           </div>
         </div>
@@ -227,6 +229,7 @@ export function HomeContent() {
           </div>
         </div>
       </section>
+      <Testimonials />
       <Pricing />
       <section className="nh-section nh-faq">
         <div className="container nh-faq-grid">

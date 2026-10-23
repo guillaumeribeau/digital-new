@@ -38,10 +38,11 @@ export async function processCommercialOutbox(limit = 20) {
     const lockId = randomUUID(), now = new Date(), lockedUntil = new Date(Date.now() + 120000);
     const rows = await db.$queryRaw<CommercialEmail[]>`UPDATE "CommercialEmail" SET "status" = 'PROCESSING', "lockId" = ${lockId}::uuid, "lockedUntil" = ${lockedUntil}::timestamptz, "attempts" = "attempts" + 1 WHERE "id" = (SELECT "id" FROM "CommercialEmail" WHERE ("status" = 'PENDING' AND "availableAt" <= ${now}::timestamptz OR "status" = 'PROCESSING' AND "lockedUntil" <= ${now}::timestamptz) AND "expiresAt" > ${now}::timestamptz AND "attempts" < 8 ORDER BY "availableAt" FOR UPDATE SKIP LOCKED LIMIT 1) RETURNING *`;
     const event = rows[0]; if (!event) break;
+    let failureStage = "EMAIL_STATE_CHECK_FAILED";
     try {
       if (!event.payloadEncrypted) throw new Error("EMPTY_EVENT");
       if (event.siteOrderId && event.kind !== "SITE_OWNER_NOTICE") {
-        const o = await db.siteOrder.findUniqueOrThrow({ where: { id: event.siteOrderId }, include: { project: { select: { stage: true, lead: { select: { deletedAt: true } } } } } });
+        const o = await db.siteOrder.findUniqueOrThrow({ where: { id: event.siteOrderId }, select: { creationPaidAt: true, firstSubscriptionPaidAt: true, project: { select: { stage: true, lead: { select: { deletedAt: true } } } } } });
         if (o.project.lead.deletedAt || o.project.stage === "CANCELLED" || event.kind === "SITE_PRESENTATION" && o.creationPaidAt || event.kind === "SITE_SUBSCRIPTION_INVITE" && o.firstSubscriptionPaidAt) { await db.commercialEmail.updateMany({ where: { id: event.id, lockId }, data: { status: "CANCELLED", lockId: null, lockedUntil: null } }); continue; }
       }
       if (event.quoteId && event.kind !== "SITE_OWNER_NOTICE") {
@@ -50,11 +51,17 @@ export async function processCommercialOutbox(limit = 20) {
           await db.commercialEmail.update({ where: { id: event.id }, data: { status: "CANCELLED", lockId: null, lockedUntil: null } }); continue;
         }
       }
-      const payload = emailSchema.parse(unseal(event.payloadEncrypted));
+      failureStage = "EMAIL_DECRYPTION_FAILED";
+      const decrypted = unseal(event.payloadEncrypted);
+      failureStage = "EMAIL_PAYLOAD_INVALID";
+      const payload = emailSchema.parse(decrypted);
+      failureStage = "RESEND_CONNECTION_FAILED";
       const response = await fetch("https://api.resend.com/emails", { method: "POST", headers: { Authorization: "Bearer " + process.env.RESEND_API_KEY, "Content-Type": "application/json", "Idempotency-Key": "nova-commercial/" + event.id }, body: JSON.stringify(payload), signal: AbortSignal.timeout(15000), cache: "no-store" });
       if (!response.ok) { await db.commercialEmail.updateMany({ where: { id: event.id, lockId }, data: { lastHttpStatus: response.status } }); throw new Error(response.status === 401 ? "RESEND_AUTH_INVALID" : response.status === 403 ? "RESEND_FORBIDDEN" : response.status === 429 ? "RESEND_RATE_LIMITED" : response.status === 422 ? "RESEND_PAYLOAD_REJECTED" : "RESEND_UNAVAILABLE"); }
+      failureStage = "RESEND_RESPONSE_INVALID";
       const result = await response.json() as { id?: string };
       if (typeof result.id !== "string" || !result.id || result.id.length > 200) throw new Error("DELIVERY_FAILED");
+      failureStage = "DELIVERY_RECORD_FAILED";
       await db.$transaction(async (tx) => {
         await tx.commercialEmail.updateMany({ where: { id: event.id, lockId, status: "PROCESSING" }, data: { status: "SENT", sentAt: new Date(), providerMessageId: result.id, lockId: null, lockedUntil: null, lastError: null, lastHttpStatus: null } });
         const receipts = await tx.commercialWebhook.findMany({ where: { emailId: result.id, deliveryStatus: { not: null } }, orderBy: { createdAt: "desc" }, take: 20 });
@@ -63,7 +70,8 @@ export async function processCommercialOutbox(limit = 20) {
         if (event.messageId) await tx.clientMessage.updateMany({ where: { id: event.messageId, deliveryStatus: "QUEUED" }, data: { deliveryStatus: status, providerId: result.id } });
       }); sent++;
     } catch (error) {
-      const reason = error instanceof Error && ["RESEND_AUTH_INVALID", "RESEND_FORBIDDEN", "RESEND_RATE_LIMITED", "RESEND_PAYLOAD_REJECTED", "RESEND_UNAVAILABLE"].includes(error.message) ? error.message : "DELIVERY_FAILED";
+      // Only fixed labels are stored; raw errors may contain credentials or email contents.
+      const reason = error instanceof Error && ["EMPTY_EVENT", "RESEND_AUTH_INVALID", "RESEND_FORBIDDEN", "RESEND_RATE_LIMITED", "RESEND_PAYLOAD_REJECTED", "RESEND_UNAVAILABLE"].includes(error.message) ? error.message : failureStage;
       const dead = event.attempts >= 8;
       await db.commercialEmail.updateMany({ where: { id: event.id, lockId, status: "PROCESSING" }, data: { status: dead ? "DEAD" : "PENDING", lockId: null, lockedUntil: null, lastError: reason, availableAt: new Date(Date.now() + Math.min(3600000, 30000 * 2 ** (event.attempts - 1))) } });
       if (dead && event.messageId) await db.clientMessage.updateMany({ where: { id: event.messageId, deliveryStatus: "QUEUED" }, data: { deliveryStatus: "DEAD" } });

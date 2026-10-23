@@ -1,0 +1,52 @@
+import { chromium } from "@playwright/test";
+import { getDb } from "@nova/database";
+import { unseal } from "@nova/shared/secure-payload";
+import { mkdir } from "node:fs/promises";
+import assert from "node:assert/strict";
+async function main() {
+  const url = new URL(process.env.DATABASE_URL!); assert.equal(url.hostname, "127.0.0.1"); assert.equal(url.pathname, "/lead_pipeline_test"); assert.equal(process.env.NODE_ENV, "test");
+  const db = getDb(), admin = process.env.BETTER_AUTH_URL!, site = process.env.NEXT_PUBLIC_TADAPO_SITE_URL!;
+  const order = await db.tadapoOrder.findFirstOrThrow({ where: { project: { lead: { businessName: "Tadapo intégration" } } } });
+  await db.tadapoOrder.update({ where: { id: order.id }, data: { stage: "PREVIEW_SENT", approvedAt: null, approvedVersion: null } });
+  const token = unseal(order.tokenEncrypted); assert.equal(typeof token, "string");
+  const browser = await chromium.launch({ executablePath: process.env.CHROME_PATH || "C:/Program Files/Google/Chrome/Application/chrome.exe", headless: true });
+  const errors: string[] = []; await mkdir("reports/tadapo-admin", { recursive: true });
+  try {
+    const context = await browser.newContext({ viewport: { width: 1440, height: 1050 }, reducedMotion: "reduce" });
+    const page = await context.newPage(); page.on("pageerror", e => errors.push(e.message));
+    await page.goto(`${admin}/commandes-tadapo`); await page.waitForURL("**/connexion");
+    await page.getByLabel("Adresse e-mail", { exact: true }).fill("tadapo-admin@example.com");
+    await page.getByLabel("Mot de passe", { exact: true }).fill("Tadapo-Test-Password-42!");
+    await page.getByRole("button", { name: "Accéder à mon espace" }).click(); await page.waitForURL(`${admin}/`);
+    await page.goto(`${admin}/projets?brand=tadapo`); await page.getByText("Tadapo intégration", { exact: false }).first().waitFor();
+    await page.goto(`${admin}/projets/${order.projectId}`);
+    await page.getByRole("heading", { name: "Réalisation Tadapo" }).waitFor();
+    assert.equal(await page.getByText("Préparer la présentation du site", { exact: true }).count(), 0);
+    await page.screenshot({ path: "reports/tadapo-admin/projet-desktop.png", fullPage: true });
+    const fileForm = page.locator('form').filter({ has: page.locator('input[type=file]') });
+    await fileForm.locator('input[type=file]').setInputFiles({ name: "contenu.pdf", mimeType: "application/pdf", buffer: Buffer.from("%PDF-navigateur-fixture") });
+    await fileForm.getByRole("button", { name: "Rattacher au dossier" }).click();
+    await page.getByRole("link", { name: "contenu.pdf" }).waitFor();
+    const clientContext = await browser.newContext({ viewport: { width: 375, height: 900 }, reducedMotion: "reduce" });
+    const client = await clientContext.newPage(); client.on("pageerror", e => errors.push(e.message));
+    await client.goto(`${site}/suivi/${order.id}#token=${token}`);
+    await client.getByRole("heading", { name: "Votre projet Tadapo." }).waitFor();
+    await client.getByRole("button", { name: "Valider cette version", exact: true }).waitFor();
+    await client.getByLabel("Votre nom", { exact: true }).first().fill("Camille Navigateur");
+    await client.getByRole("button", { name: "Valider cette version", exact: true }).click();
+    await client.getByText("Vous avez validé cette version.", { exact: true }).waitFor();
+    assert.equal((await db.tadapoOrder.findUniqueOrThrow({ where: { id: order.id } })).approvedName, "Camille Navigateur");
+    assert.ok(await client.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+    await client.screenshot({ path: "reports/tadapo-admin/suivi-mobile.png", fullPage: true });
+    await page.reload(); const stageForm = page.locator('form').filter({ has: page.locator('input[name=action][value=stage]') });
+    await stageForm.locator('select[name=stage]').selectOption("PUBLISHED"); await stageForm.getByRole("button", { name: "Valider l’étape" }).click();
+    await stageForm.getByRole("status").waitFor();
+    assert.equal((await db.tadapoOrder.findUniqueOrThrow({ where: { id: order.id } })).stage, "PUBLISHED");
+    await page.goto(`${admin}/clients?brand=tadapo`); await page.getByText("Tadapo intégration", { exact: true }).waitFor();
+    await page.goto(`${admin}/commandes-tadapo`); await page.getByRole("heading", { name: "Commandes et abonnements." }).waitFor();
+    await page.screenshot({ path: "reports/tadapo-admin/commandes.png", fullPage: true });
+    assert.deepEqual(errors, []);
+    console.log("Tadapo navigateur : filtre de marque, dossier admin, fichier privé, validation client mobile et publication manuelle — OK.");
+  } finally { await browser.close(); await db.$disconnect(); }
+}
+main().catch(error => { console.error(error); process.exitCode = 1; });

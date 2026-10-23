@@ -2,18 +2,14 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "@/components/ui/tracked-link";
-import { examples } from "@/lib/examples";
+import { darkExampleSlugs, examples, exampleSectors } from "@/lib/examples";
 import "@/styles/portfolio.css";
-const sectors = [
-  "Tous",
-  "Artisanat",
-  "Commerce",
-  "Indépendants",
-  "Professions libérales",
-  "Associations",
-];
+const sectors = exampleSectors;
 export function Gallery({ compact = false }: { compact?: boolean }) {
   const [filter, setFilter] = useState("Tous");
+  const [search, setSearch] = useState("");
+  const [tone, setTone] = useState("all");
+  const [sort, setSort] = useState("selection");
   useEffect(() => {
     if (compact) return;
     type Tool = {
@@ -62,6 +58,8 @@ export function Gallery({ compact = false }: { compact?: boolean }) {
                 throw new Error("Secteur non valide.");
               const sector = input.sector;
               setFilter(sector);
+              setSearch("");
+              setTone("all");
               await new Promise<void>((resolve) =>
                 requestAnimationFrame(() =>
                   requestAnimationFrame(() => resolve()),
@@ -81,12 +79,16 @@ export function Gallery({ compact = false }: { compact?: boolean }) {
     } catch {}
     return () => lifecycle.abort();
   }, [compact]);
-  const selected = (compact ? examples.filter((_, index) => index < 3 || index >= 6) : examples).filter(
-    (d) => filter === "Tous" || d.category === filter,
-  );
+  const normalize = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("fr");
+  const selected = (compact ? examples.filter((_, index) => index < 3 || (index >= 6 && index < 9)) : examples).filter(
+    (d) => (filter === "Tous" || d.category === filter)
+      && (tone === "all" || darkExampleSlugs.includes(d.slug) === (tone === "dark"))
+      && normalize(`${d.name} ${d.sector} ${d.description} ${d.type}`).includes(normalize(search.trim())),
+  ).sort((a, b) => sort === "name" ? a.name.localeCompare(b.name, "fr") : sort === "sector" ? a.sector.localeCompare(b.sector, "fr") : sort === "newest" ? examples.indexOf(b) - examples.indexOf(a) : examples.indexOf(a) - examples.indexOf(b));
   return (
     <div>
       {!compact && (
+        <>
         <div
           className="filters"
           role="group"
@@ -102,12 +104,20 @@ export function Gallery({ compact = false }: { compact?: boolean }) {
             </button>
           ))}
         </div>
+        <div className="gallery-controls">
+          <label>Rechercher un métier<input type="search" placeholder="Électricien, boulangerie…" value={search} onChange={event => setSearch(event.target.value)} /></label>
+          <label>Ambiance<select aria-label="Ambiance" value={tone} onChange={event => setTone(event.target.value)}><option value="all">Toutes les ambiances</option><option value="light">Claire</option><option value="dark">Sombre</option></select></label>
+          <label>Trier par<select aria-label="Trier par" value={sort} onChange={event => setSort(event.target.value)}><option value="selection">Notre sélection</option><option value="newest">Nouveautés</option><option value="name">Nom de A à Z</option><option value="sector">Métier de A à Z</option></select></label>
+        </div>
+        <div className="gallery-results"><p role="status">{selected.length} exemple{selected.length > 1 ? "s" : ""} affiché{selected.length > 1 ? "s" : ""}</p>{(filter !== "Tous" || search || tone !== "all" || sort !== "selection") && <button type="button" onClick={() => { setFilter("Tous"); setSearch(""); setTone("all"); setSort("selection"); }}>Réinitialiser</button>}</div>
+        </>
       )}
       <p className="sr-only" aria-live="polite">
         {selected.length} exemple{selected.length > 1 ? "s" : ""} affiché
         {selected.length > 1 ? "s" : ""}
       </p>
       <div className={"portfolio-grid " + (compact ? "portfolio-compact" : "")}>
+        {selected.length === 0 && <p className="gallery-empty">Aucun exemple ne correspond à ces critères. Essayez un autre métier ou réinitialisez les filtres.</p>}
         {selected.map((d, i) => (
           <article
             className={
@@ -125,7 +135,7 @@ export function Gallery({ compact = false }: { compact?: boolean }) {
               aria-label={"Explorer le site de démonstration " + d.name}
             >
               <div className="portfolio-preview-label">
-                <span>0{examples.indexOf(d) + 1} / SITE ONE-PAGE</span>
+                <span>{String(examples.indexOf(d) + 1).padStart(2, "0")} / SITE ONE-PAGE</span>
                 <span>{d.type}</span>
               </div>
               <div className="portfolio-desktop">

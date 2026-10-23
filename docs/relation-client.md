@@ -88,6 +88,41 @@ Pour un essai Stripe réel en mode test sur localhost, utiliser la CLI Stripe av
 
 ## Worker, migrations et sauvegardes
 
+### Correctif des droits de lecture du worker — 21 octobre 2026
+
+Le contrôle d’une proposition avant expédition lit `SiteOrder`, `Project` et l’indicateur de corbeille de `Lead`. Les anciens droits du worker ne permettaient pas toutes ces lectures : une proposition pouvait rester en attente puis échouer avec `DELIVERY_FAILED` sans appel à Resend.
+
+Le correctif limite la requête aux colonnes nécessaires. La migration additive `20261021130000_commercial_worker_read_access` accorde ces lectures aux rôles `nova_worker` et `nova_worker_<suffixe hexadécimal>` disposant déjà de droits de traitement des files. Le script de configuration commerciale accorde les mêmes droits aux nouveaux workers.
+
+Pour appliquer le correctif :
+
+1. Déployer la version contenant la nouvelle migration et le code du worker corrigé. Faire appliquer `npm run db:migrate:deploy` par le service de migrations, avec sa connexion opérateur habituelle. Le worker ne doit pas recevoir cette connexion privilégiée.
+2. Vérifier que la migration est terminée et que le worker utilise la nouvelle version. Un rôle portant un autre nom doit recevoir les mêmes droits ciblés via l’opérateur :
+
+   ```sql
+   -- Remplacer VOTRE_ROLE_WORKER par le rôle PostgreSQL réel du worker.
+   GRANT SELECT ("id", "projectId", "creationPaidAt", "firstSubscriptionPaidAt") ON "SiteOrder" TO "VOTRE_ROLE_WORKER";
+   GRANT SELECT ("id", "leadId", "stage") ON "Project" TO "VOTRE_ROLE_WORKER";
+   GRANT SELECT ("id", "deletedAt") ON "Lead" TO "VOTRE_ROLE_WORKER";
+   ```
+
+3. Si un message est encore en attente, laisser le worker effectuer sa prochaine tentative sans ajouter de doublon.
+4. Pour un message en échec définitif, vérifier l’historique et les envois Resend avant un renvoi manuel depuis la fiche projet.
+5. Contrôler le passage à « Envoyé » dans l’admin et la présence du message dans Resend. Le statut « Livré » nécessite le suivi par webhook.
+
+Les prochaines erreurs distinguent les contrôles métier (`EMAIL_STATE_CHECK_FAILED`), le déchiffrement (`EMAIL_DECRYPTION_FAILED`), le contenu (`EMAIL_PAYLOAD_INVALID`), la connexion Resend (`RESEND_CONNECTION_FAILED`), sa réponse (`RESEND_RESPONSE_INVALID`) et l’enregistrement de l’envoi (`DELIVERY_RECORD_FAILED`). Ce sont des étapes d’échec, pas une preuve automatique de leur cause précise. Les erreurs d’authentification et les codes de rejet Resend existants restent conservés. Aucun contenu d’e-mail ni secret n’est ajouté au diagnostic.
+
+Le déploiement et les droits de la base Railway réelle doivent être vérifiés séparément : les tests locaux isolés ne modifient pas la production.
+
+La vérification des droits a été étendue aux autres parcours avec de vrais comptes PostgreSQL restreints dans la base de test :
+
+- Compte du site : enregistrement et confirmation d’une demande, création des accusés et notifications ; accès aux tables de commandes et d’authentification refusé.
+- Worker : confirmation d’adresse, accusé de réception, notification interne, présentation, ajustements, invitation d’abonnement, devis, relance, message et notification propriétaire ; mise à jour du suivi d’envoi.
+- Worker : annulation sans appel au fournisseur des présentations déjà payées et des invitations dont le premier mois est payé ; lecture des coordonnées clients et des jetons de commande, modification des projets refusées.
+- Compte admin : conversion en projet, notes, présentation, ajustements, choix de domaine, retours client, clôture de série, validation, préparation du domaine et invitation d’abonnement ; modification arbitraire des coordonnées et suppression de l’audit refusées.
+
+Les appels e-mail sont simulés. Le paiement initial du scénario de droits est un état de test ; les signatures, montants, notifications et transitions de paiement sont vérifiés par les scénarios d’intégration Stripe existants. Ces contrôles ne prouvent pas la livraison réelle chez Resend ni les autorisations effectivement déployées dans Railway.
+
 Le worker existant traite aussi les messages et devis commerciaux :
 
 ```powershell

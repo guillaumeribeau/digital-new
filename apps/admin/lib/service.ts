@@ -7,9 +7,9 @@ import { paymentMode } from "./commercial-core";
 
 export class BusinessError extends Error {}
 const uuid = z.uuid();
-const leadSelect = { id: true, businessName: true, fullName: true, email: true, phone: true,
+const leadSelect = { brand: true, id: true, businessName: true, fullName: true, email: true, phone: true,
   businessSector: true, services: true, city: true, status: true, createdAt: true } satisfies Prisma.LeadSelect;
-export const querySchema = z.object({ q: z.string().trim().max(200).default(""),
+export const querySchema = z.object({ brand: z.enum(["", "zelyweb", "tadapo"]).default(""), q: z.string().trim().max(200).default(""),
   view: z.enum(["active", "trash"]).default("active"),
   status: z.string().max(40).default(""), sort: z.enum(["desc", "asc"]).default("desc"),
   page: z.coerce.number().int().min(1).max(100000).default(1) });
@@ -46,6 +46,7 @@ export const adminService = {
     if (query.status && !Object.hasOwn(leadTransitions, query.status)) throw new BusinessError("INVALID_FILTER");
     const where: Prisma.LeadWhereInput = {
       deletedAt: query.view === "trash" ? { not: null } : null,
+      ...(query.brand ? { brand: query.brand } : {}),
       ...(query.status ? { status: query.status as LeadStatusCode } : {}),
       ...(query.q ? { OR: ["businessName", "fullName", "email", "businessSector", "services", "city"].map((field) =>
         ({ [field]: { contains: query.q, mode: "insensitive" } })) } : {}),
@@ -128,7 +129,7 @@ export const adminService = {
     const query = querySchema.parse(input);
     const stages = ["ACCEPTED", "CONTENT_PREPARATION", "CREATION", "REVIEW", "PREVIEW_READY", "PREVIEW_SENT", "AWAITING_APPROVAL", "APPROVED", "AWAITING_PAYMENT", "PAID", "PUBLISHING", "PUBLISHED", "CANCELLED"];
     if (query.status && !stages.includes(query.status)) throw new BusinessError("INVALID_FILTER");
-    const where: Prisma.ProjectWhereInput = { ...(query.status ? { stage: query.status as ProjectStageCode } : {}),
+    const where: Prisma.ProjectWhereInput = { ...(query.brand ? { AND: [{ lead: { brand: query.brand } }] } : {}), ...(query.status ? { stage: query.status as ProjectStageCode } : {}),
       ...(query.q ? { lead: { OR: ["businessName", "fullName", "email"].map((field) => ({ [field]: { contains: query.q, mode: "insensitive" } })) } } : {}) };
     const [total, rows] = await getDb().$transaction([getDb().project.count({ where }), getDb().project.findMany({ where,
       include: { lead: { select: leadSelect } }, take: 20, skip: (query.page - 1) * 20,
@@ -148,6 +149,7 @@ export const adminService = {
     await getDb().$transaction(async (tx) => {
       await tx.$queryRaw`SELECT "id" FROM "Project" WHERE "id" = ${data.id}::uuid FOR UPDATE`;
       const project = await tx.project.findUnique({ where: { id: data.id } });
+      if (project && await tx.tadapoOrder.findUnique({ where: { projectId: project.id } })) throw new BusinessError("TADAPO_WORKFLOW_REQUIRED");
       if (!project || project.stage !== data.expected) throw new BusinessError("STALE_STATUS");
       if (!nextProjectStages(project.stage).includes(data.stage as ProjectStageCode)) throw new BusinessError("INVALID_TRANSITION");
       if (data.stage === "PUBLISHED" && !project.websiteUrl) throw new BusinessError("WEBSITE_URL_REQUIRED");
@@ -167,6 +169,12 @@ export const adminService = {
     const actor = await authenticate(headers);
     const data = z.object({ id: uuid, expectedUpdatedAt: z.iso.datetime(), previewUrl: urlSchema, websiteUrl: urlSchema }).parse(input);
     await getDb().$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT "id" FROM "TadapoOrder" WHERE "projectId" = ${data.id}::uuid FOR UPDATE`;
+      const tadapo = await tx.tadapoOrder.findUnique({ where: { projectId: data.id }, include: { project: true } });
+      if (tadapo && tadapo.project?.previewUrl !== (data.previewUrl || null)) {
+        await tx.tadapoOrder.update({ where: { id: tadapo.id }, data: { reviewVersion: { increment: 1 }, approvedAt: null, approvedVersion: null, approvedName: null } });
+      }
+      if (tadapo && tadapo.project?.websiteUrl !== (data.websiteUrl || null)) await tx.tadapoOrder.update({ where: { id: tadapo.id }, data: { domainReadyAt: null } });
       const count = await tx.project.updateMany({ where: { id: data.id, updatedAt: new Date(data.expectedUpdatedAt) },
         data: { previewUrl: data.previewUrl || null, websiteUrl: data.websiteUrl || null } });
       if (count.count !== 1) throw new BusinessError("STALE_STATUS");

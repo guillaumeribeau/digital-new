@@ -2,8 +2,18 @@
   "name": "@nova/shared",
   "version": "0.1.0",
   "private": true,
+  "dependencies": {
+    "@nova/database": "*",
+    "@nova/validation": "*",
+    "stripe": "^23.0.0",
+    "zod": "^4.1.0"
+  },
   "exports": {
     ".": "./index.ts",
-    "./business": "./business.ts"
+    "./business": "./business.ts",
+    "./tadapo": "./tadapo.ts",
+    "./tadapo-server": "./tadapo-server.ts",
+    "./tadapo-domain": "./tadapo-domain.ts",
+    "./secure-payload": "./secure-payload.ts"
   }
 }

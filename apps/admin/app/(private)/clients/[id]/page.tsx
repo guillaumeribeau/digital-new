@@ -1,7 +1,7 @@
 import { requireAdmin } from "../../../../lib/access";
 import Link from "next/link";
 import { headers } from "next/headers";
-import { notFound } from "next/navigation";
+import { redirect, notFound } from "next/navigation";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { commercialService } from "../../../../lib/commercial";
@@ -14,6 +14,7 @@ export default async function ClientDetail({ params }: { params: Promise<{ id: s
   await requireAdmin();
   const { id } = await params; if (!z.uuid().safeParse(id).success) notFound();
   const h = await headers(), client = await commercialService.client(h, id); if (!client) notFound();
+  if (client.brand === "tadapo" && client.project) redirect(`/projets/${client.project.id}`);
   const templates = await commercialService.templates(h);
   return <><Link className="back-link" href="/clients">← Tous les clients</Link><PageTitle eyebrow="RELATION CLIENT" title={client.businessName} description={`${client.fullName} · ${client.email}`} action={<Link className="button" href={`/devis/nouveau?client=${id}`}>Nouveau devis complémentaire</Link>} />
     <nav className="commercial-tabs" aria-label="Fiche client"><a href="#echanges">Échanges</a><a href="#devis">Devis</a><a href="#paiements">Paiements</a><Link href={`/emails?client=${id}`}>Historique des e-mails</Link><Link href={`/demandes/${id}`}>Demande initiale</Link>{client.project && <Link href={`/projets/${client.project.id}`}>Projet</Link>}</nav>

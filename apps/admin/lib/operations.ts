@@ -14,7 +14,7 @@ export async function resendEmail(h: Headers, id: string, requestId: string) {
     if (!payload && e.siteOrder) { const { rebuildSiteEmail } = await import("./site-billing"); payload = seal(rebuildSiteEmail(e.siteOrder, e.kind)); }
     if (!payload) throw new CommercialError("INVALID_ACTION");
     if (await tx.commercialEmail.findFirst({ where: { resendOfId: id, status: { in: ["PENDING", "PROCESSING"] } } })) throw new CommercialError("REMINDER_PENDING");
-    await tx.commercialEmail.create({ data: { siteOrderId: e.siteOrderId, quoteId: e.quoteId, kind: e.kind, payloadEncrypted: payload, resendOfId: id, manualRequestId: requestId, expiresAt: new Date(Date.now() + 23 * 3600000) } });
+    await tx.commercialEmail.create({ data: { tadapoOrderId: e.tadapoOrderId, siteOrderId: e.siteOrderId, quoteId: e.quoteId, kind: e.kind, payloadEncrypted: payload, resendOfId: id, manualRequestId: requestId, expiresAt: new Date(Date.now() + 23 * 3600000) } });
   });
 }
 export async function financialStage(tx: Prisma.TransactionClient, projectId: string, stage: "PREVIEW_SENT" | "AWAITING_PAYMENT" | "PAID") {

@@ -121,6 +121,32 @@ export const examples = [
     palette: ["#0c121b", "#e8f1f5", "#8de3ee"],
     type: "Bleu nuit & technique",
   },
+  {
+    slug: "electricien", name: "Volt & Maison", shortName: "Volt & Maison", sector: "Électricien", category: "Artisanat", theme: "electrician",
+    tagline: "De bonnes idées. Bien connectées.", description: "Un univers bleu électrique, une présentation précise des interventions et un parcours de demande de devis direct.",
+    palette: ["#10243a", "#f2f5fa", "#dfff70"], type: "Technique & lumineux",
+  },
+  {
+    slug: "nettoyage", name: "Clair & Net", shortName: "Clair & Net", sector: "Entreprise de nettoyage", category: "Indépendants", theme: "cleaning",
+    tagline: "Des lieux nets. L’esprit léger.", description: "Une identité fraîche et lumineuse pour présenter l’entretien des bureaux, des commerces et des parties communes.",
+    palette: ["#166765", "#f4faf7", "#cce8da"], type: "Frais & épuré",
+  },
+  {
+    slug: "coach-sportif", name: "Élan Studio", shortName: "Élan Studio", sector: "Coach sportif", category: "Indépendants", theme: "fitness",
+    tagline: "Votre énergie. Votre rythme.", description: "Un site sombre et énergique, des programmes lisibles et une invitation à construire un accompagnement personnel.",
+    palette: ["#191b1a", "#f4f3ec", "#d4f75a"], type: "Sombre & énergique",
+  },
+  {
+    slug: "boulangerie", name: "Maison Levain", shortName: "Maison Levain", sector: "Boulangerie artisanale", category: "Commerce", theme: "bakery",
+    tagline: "Le temps fait les bonnes choses.", description: "Des couleurs farine et terracotta, une typographie généreuse et un regard gourmand sur le pain au levain.",
+    palette: ["#63382b", "#faf0de", "#cb7850"], type: "Artisanal & chaleureux",
+  },
+  {
+    slug: "immobilier", name: "Adresse Singulière", shortName: "Adresse Singulière", sector: "Agent immobilier", category: "Professions libérales", theme: "realestate",
+    tagline: "Un lieu. Une nouvelle histoire.", description: "Un portfolio immobilier aux tons bordeaux et ivoire, des espaces mis en valeur et un accompagnement incarné.",
+    palette: ["#442634", "#f4f0e9", "#bb9474"], type: "Élégant & éditorial",
+  },
 ] as const;
+export const darkExampleSlugs: readonly string[] = ["restaurant", "photographe", "automobile", "coach-sportif"];
 export type ExampleSlug = (typeof examples)[number]["slug"];
 export type Example = (typeof examples)[number];

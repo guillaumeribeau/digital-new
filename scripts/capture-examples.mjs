@@ -13,6 +13,7 @@ const allSlugs = [
   "restaurant",
   "photographe",
   "automobile",
+  "electricien", "nettoyage", "coach-sportif", "boulangerie", "immobilier",
 ];
 const requested = process.argv.slice(2);
 const slugs = requested.length ? allSlugs.filter(slug => requested.includes(slug)) : allSlugs;

@@ -672,6 +672,103 @@
   max-width: 380px;
   margin: 0;
 }
+.nh-testimonials {
+  background: var(--nh-soft);
+}
+.nh-testimonial-grid {
+  display: flex;
+  gap: 22px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: thin;
+  scrollbar-color: var(--blue) transparent;
+  padding-bottom: 16px;
+}
+.nh-testimonial-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 22px;
+}
+.nh-testimonial-controls > span {
+  font-size: 11px;
+  color: var(--muted);
+}
+.nh-testimonial-controls > div {
+  display: flex;
+  gap: 8px;
+}
+.nh-testimonial-controls button {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid #c9cfc3;
+  border-radius: 3px;
+  background: var(--paper);
+  color: var(--blue);
+  cursor: pointer;
+}
+.nh-testimonial-controls button:hover {
+  background: var(--blue);
+  color: white;
+}
+.nh-testimonial-controls button:focus-visible,
+.nh-testimonial-grid:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 4px;
+}
+.nh-testimonial-card {
+  flex: 0 0 calc((100% - 44px) / 3);
+  min-width: 0;
+  box-sizing: border-box;
+  scroll-snap-align: start;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 32px;
+  border: 1px solid #c9cfc3;
+  background: var(--paper);
+}
+.nh-testimonial-card > svg {
+  color: var(--blue);
+  margin-bottom: 25px;
+}
+.nh-testimonial-card blockquote {
+  margin: 0 0 30px;
+}
+.nh-testimonial-card blockquote p {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.85;
+  color: var(--ink);
+}
+.nh-testimonial-theme {
+  width: 100%;
+  margin: auto 0 0;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--blue);
+}
+@media (max-width: 900px) {
+  .nh-testimonial-grid {
+    gap: 18px;
+  }
+  .nh-testimonial-card {
+    flex-basis: calc((100% - 18px) / 2);
+    padding: 26px;
+  }
+}
+@media (max-width: 600px) {
+  .nh-testimonial-card {
+    flex-basis: 100%;
+  }
+}
 .home-redesign .pricing-section {
   background: var(--paper);
   padding-block: 105px;

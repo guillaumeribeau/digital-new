@@ -38,6 +38,7 @@ enum OutboxStatus {
 }
 
 model Lead {
+  brand                  String     @default("zelyweb") @db.VarChar(20)
   id                     String     @id @default(uuid()) @db.Uuid
   createdAt              DateTime   @default(now()) @db.Timestamptz(3)
   updatedAt              DateTime   @updatedAt @db.Timestamptz(3)
@@ -155,6 +156,7 @@ enum ProjectStage {
 }
 
 model Project {
+  tadapoOrder     TadapoOrder?
   id              String @id @default(uuid()) @db.Uuid
   leadId          String @unique @db.Uuid
   stage           ProjectStage @default(ACCEPTED)
@@ -500,6 +502,8 @@ model BillingInvoice {
 }
 
 model CommercialEmail {
+  tadapoOrderId     String? @db.Uuid
+  tadapoOrder       TadapoOrder? @relation(fields: [tadapoOrderId], references: [id], onDelete: Restrict)
   id                String @id @default(uuid()) @db.Uuid
   quoteId           String? @db.Uuid
   messageId         String? @db.Uuid
@@ -525,6 +529,88 @@ model CommercialEmail {
   message           ClientMessage? @relation(fields: [messageId], references: [id], onDelete: Restrict)
   @@index([status, availableAt])
   @@index([siteOrderId, createdAt])
+}
+
+model TadapoOrder {
+  id                   String @id @default(uuid()) @db.Uuid
+  requestId            String @unique @db.Uuid
+  payloadHash          String @db.Char(64)
+  projectId            String? @unique @db.Uuid
+  project              Project? @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  createdAt            DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt            DateTime @updatedAt @db.Timestamptz(3)
+  brief                Json
+  offerSnapshot        Json
+  consentSnapshot      Json
+  mode                 String @db.VarChar(10)
+  stage                String @default("PAYMENT_PENDING") @db.VarChar(40)
+  tokenHash            String @unique @db.Char(64)
+  tokenEncrypted       String @db.Text
+  stripeSessionId      String? @unique @db.VarChar(200)
+  checkoutUrl          String? @db.VarChar(2000)
+  checkoutExpiresAt    DateTime? @db.Timestamptz(3)
+  stripeCustomerId     String? @db.VarChar(200)
+  stripeSubscriptionId String? @unique @db.VarChar(200)
+  subscriptionStatus   String? @db.VarChar(40)
+  paidAt               DateTime? @db.Timestamptz(3)
+  contentCompleteAt    DateTime? @db.Timestamptz(3)
+  commitmentEndAt      DateTime? @db.Timestamptz(3)
+  cancelRequestedAt    DateTime? @db.Timestamptz(3)
+  cancelEffectiveAt    DateTime? @db.Timestamptz(3)
+  nextBillingAt        DateTime? @db.Timestamptz(3)
+  billingAlert         Boolean @default(false)
+  reviewVersion        Int @default(1)
+  approvedVersion      Int?
+  approvedAt           DateTime? @db.Timestamptz(3)
+  approvedName         String? @db.VarChar(200)
+  domainQuote          Json?
+  domainVersion        Int @default(0)
+  domainAcceptedAt     DateTime? @db.Timestamptz(3)
+  domainSessionId      String? @unique @db.VarChar(200)
+  domainAttempt        Int @default(0)
+  domainCheckoutUrl    String? @db.VarChar(2000)
+  domainPaidAt         DateTime? @db.Timestamptz(3)
+  domainPurchasedAt    DateTime? @db.Timestamptz(3)
+  domainReadyAt        DateTime? @db.Timestamptz(3)
+  emails               CommercialEmail[]
+  invoices             TadapoInvoice[]
+  feedback             TadapoFeedback[]
+  files                TadapoFile[]
+  @@index([stage, createdAt])
+}
+
+model TadapoInvoice {
+  id              String @id @db.VarChar(200)
+  orderId         String @db.Uuid
+  order           TadapoOrder @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  createdAt       DateTime @default(now()) @db.Timestamptz(3)
+  amountCents     Int
+  status          String @db.VarChar(30)
+  hostedUrl       String? @db.VarChar(2000)
+  pdfUrl          String? @db.VarChar(2000)
+  periodEnd       DateTime? @db.Timestamptz(3)
+  @@index([orderId, createdAt])
+}
+
+model TadapoFeedback {
+  id        String @id @default(uuid()) @db.Uuid
+  requestId String @unique @db.Uuid
+  orderId   String @db.Uuid
+  order     TadapoOrder @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  version   Int
+  content   String @db.VarChar(10000)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+}
+
+model TadapoFile {
+  id        String @id @default(uuid()) @db.Uuid
+  orderId   String @db.Uuid
+  order     TadapoOrder @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  filename  String @db.VarChar(200)
+  mimeType  String @db.VarChar(100)
+  sizeBytes Int
+  encrypted String @db.Text
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
 }
 
 model CommercialWebhook {

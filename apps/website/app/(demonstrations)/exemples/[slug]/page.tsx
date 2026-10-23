@@ -8,6 +8,7 @@ import { ConsultingSite } from "@/components/examples/consulting-site";
 import { WellnessSite } from "@/components/examples/wellness-site";
 import { CommunitySite } from "@/components/examples/community-site";
 import { RestaurantSite, PhotographerSite, AutomotiveSite } from "@/components/examples/dark-sites";
+import { NewDemoSite } from "@/components/examples/new-sites";
 export const dynamicParams = false;
 export function generateStaticParams() {
   return examples.map((e) => ({ slug: e.slug }));
@@ -44,6 +45,12 @@ export default async function DemoPage({
 }) {
   const { slug } = await params;
   switch (slug) {
+    case "electricien":
+    case "nettoyage":
+    case "coach-sportif":
+    case "boulangerie":
+    case "immobilier":
+      return <NewDemoSite slug={slug} />;
     case "plombier":
       return <PlumberSite />;
     case "paysagiste":

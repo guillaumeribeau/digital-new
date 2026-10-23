@@ -322,5 +322,60 @@
     "file": "/examples/automobile/about.jpg",
     "dimensions": "1600x2400",
     "sha256": "58FCB8B378F46459C9B1225C04487F8B5ED1677DA533DECAFCABC3143DFF13AF"
+  },
+  {
+    "site": "electricien",
+    "usage": "hero",
+    "description": "Installation électrique",
+    "author": "Pixabay",
+    "page": "https://www.pexels.com/photo/257736/",
+    "license": "https://www.pexels.com/license/",
+    "sourceUrl": "https://images.pexels.com/photos/257736/pexels-photo-257736.jpeg?auto=compress&cs=tinysrgb&w=1600",
+    "file": "/examples/electricien/hero.jpg",
+    "sha256": "0c3d5ec2283db73c5217ca4d5950f2128d5d62a8fbcb48c10387e86231c9bcef"
+  },
+  {
+    "site": "nettoyage",
+    "usage": "hero",
+    "description": "Matériel d’entretien et nettoyage",
+    "author": "cottonbro studio",
+    "page": "https://www.pexels.com/photo/4239031/",
+    "license": "https://www.pexels.com/license/",
+    "sourceUrl": "https://images.pexels.com/photos/4239031/pexels-photo-4239031.jpeg?auto=compress&cs=tinysrgb&w=1600",
+    "file": "/examples/nettoyage/hero.jpg",
+    "sha256": "edd82d7525eae3822248bf0012e007dc08c9c3d673c4fbcff719406cc7decbe0"
+  },
+  {
+    "site": "coach-sportif",
+    "usage": "hero",
+    "description": "Équipement de salle de sport",
+    "author": "Leon Ardho",
+    "page": "https://www.pexels.com/photo/1552242/",
+    "license": "https://www.pexels.com/license/",
+    "sourceUrl": "https://images.pexels.com/photos/1552242/pexels-photo-1552242.jpeg?auto=compress&cs=tinysrgb&w=1600",
+    "file": "/examples/coach-sportif/hero.jpg",
+    "sha256": "127dc288f5b95f835e3abd7041cdf4e4c3c52f1cf56c328dc2fd68170d4f5501"
+  },
+  {
+    "site": "boulangerie",
+    "usage": "hero",
+    "description": "Pains et baguettes artisanales",
+    "author": "Pixabay",
+    "page": "https://www.pexels.com/photo/209206/",
+    "license": "https://www.pexels.com/license/",
+    "sourceUrl": "https://images.pexels.com/photos/209206/pexels-photo-209206.jpeg?auto=compress&cs=tinysrgb&w=1600",
+    "file": "/examples/boulangerie/hero.jpg",
+    "sha256": "caf083f138cbea83542594a92001b7ec56bf656ee7a678b826b2804494a5c502"
+  },
+  {
+    "site": "immobilier",
+    "usage": "hero",
+    "description": "Maison avec jardin",
+    "author": "Binyamin Mellish",
+    "page": "https://www.pexels.com/photo/106399/",
+    "license": "https://www.pexels.com/license/",
+    "sourceUrl": "https://images.pexels.com/photos/106399/pexels-photo-106399.jpeg?auto=compress&cs=tinysrgb&w=1600",
+    "file": "/examples/immobilier/hero.jpg",
+    "sha256": "23340d79b6fbda7a80ac32383638e05ab076e933839cc8fb7a1a5a98f51f1167"
   }
 ]

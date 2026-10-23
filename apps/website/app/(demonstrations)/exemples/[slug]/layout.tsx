@@ -3,6 +3,7 @@ import { DemoMotion } from "@/components/examples/demo-motion";
 import { Cormorant_Garamond, Manrope } from "next/font/google";
 import "@/styles/examples.css";
 import "@/styles/examples-dark.css";
+import "@/styles/examples-new.css";
 const serif = Cormorant_Garamond({
   subsets: ["latin"],
   weight: ["400", "500", "600"],

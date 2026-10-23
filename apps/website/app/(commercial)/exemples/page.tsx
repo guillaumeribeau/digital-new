@@ -1,9 +1,10 @@
 import { Gallery } from "@/components/sections/gallery";
 import { FinalCTA } from "@/components/sections/final-cta";
 import { pageMetadata } from "@/lib/seo";
+import { examples } from "@/lib/examples";
 export const metadata = pageMetadata(
-  "Exemples — Neuf vrais sites de démonstration",
-  "Explorez neuf sites vitrines : artisanat, commerce, conseil, bien-être, association, restaurant, photographie et automobile. Des univers lumineux et sombres. Des entreprises fictives, de véritables sites.",
+  "Exemples — 14 sites de démonstration à explorer",
+  "Explorez 14 sites vitrines fictifs. Filtrez par secteur, métier et ambiance, puis classez les exemples pour trouver le style de votre futur site.",
   "/exemples",
 );
 export default function Examples() {
@@ -14,7 +15,7 @@ export default function Examples() {
           <p className="eyebrow">
             <span aria-hidden="true">✳︎</span> LES POSSIBILITÉS PRENNENT VIE
           </p>
-          <span>09 MÉTIERS / 09 UNIVERS</span>
+          <span>{examples.length} MÉTIERS / {examples.length} UNIVERS</span>
         </div>
         <h1>
           Le vôtre pourrait
@@ -38,7 +39,7 @@ export default function Examples() {
         <div className="portfolio-disclaimer">
           <span>POUR VOUS INSPIRER</span>
           <p>
-            Ces neuf entreprises sont fictives. Les photographies sont
+            Ces entreprises sont fictives. Les photographies sont
             illustratives et les formulaires n’envoient aucun message. Les
             aperçus sont capturés depuis les sites que vous pouvez explorer.
           </p>

@@ -65,7 +65,7 @@ test("présentation privée, aperçu HTML, prix figé, accès et consentement ob
   assert.equal((await clientGet(request(), ctx())).status, 401, "Draft inaccessible even with the token");
   await sendSitePresentation(h(), orderId, saved.version);
   await assert.rejects(saveSitePresentation(h(), { ...input, expectedVersion: 1 }), CommercialError);
-  const email = await db.commercialEmail.findFirstOrThrow({ where: { kind: "SITE_PRESENTATION" }, orderBy: { createdAt: "desc" } });
+  const email = await db.commercialEmail.findFirstOrThrow({ where: { siteOrderId: orderId, kind: "SITE_PRESENTATION" }, orderBy: { createdAt: "desc" } });
   const mail = unseal(email.payloadEncrypted!) as { html: string; text: string; attachments: { content_id: string }[] };
   assert.ok(mail.html.includes("lien provisoire")); assert.ok(mail.html.includes("quelques questions")); assert.ok(mail.html.includes("4. Activez"));
   assert.ok(mail.html.includes("cid:site-preview")); assert.equal(mail.attachments[0].content_id, "site-preview");
@@ -143,12 +143,12 @@ test("premier mois refusé bloque la publication ; régularisation, factures, re
   const revision = await prepareRevisionEmail(h(), orderId, "Questions personnalisées : vos textes et photos vous conviennent-ils ? <script>indésirable</script>");
   assert.ok(revision.html.includes("420,00")); assert.ok(!revision.html.includes("<script>"));
   await assert.rejects(sendRevisionEmail(h(), orderId, revision.version + 1), CommercialError);
-  const revisionPreview = await db.commercialEmail.count({ where: { kind: "SITE_REVISION_REQUEST" } }); assert.equal(revisionPreview, 0);
+  const revisionPreview = await db.commercialEmail.count({ where: { siteOrderId: orderId, kind: "SITE_REVISION_REQUEST" } }); assert.equal(revisionPreview, 0);
   await sendRevisionEmail(h(), orderId, revision.version);
   await assert.rejects(sendRevisionEmail(h(), orderId, revision.version), CommercialError);
-  const revisionMail = unseal((await db.commercialEmail.findFirstOrThrow({ where: { kind: "SITE_REVISION_REQUEST" } })).payloadEncrypted!) as { reply_to: string; html: string; text: string };
+  const revisionMail = unseal((await db.commercialEmail.findFirstOrThrow({ where: { siteOrderId: orderId, kind: "SITE_REVISION_REQUEST" } })).payloadEncrypted!) as { reply_to: string; html: string; text: string };
   assert.equal(revisionMail.reply_to, "contact@zelyweb.com"); assert.ok(revisionMail.text.includes("Trois séries"));
-  assert.equal(await db.commercialEmail.count({ where: { kind: "SITE_REVISION_REQUEST" } }), 1);
+  assert.equal(await db.commercialEmail.count({ where: { siteOrderId: orderId, kind: "SITE_REVISION_REQUEST" } }), 1);
   let project = await db.project.findUniqueOrThrow({ where: { id: projectId } });
   await adminService.projectLinks(h(), { id: projectId, expectedUpdatedAt: project.updatedAt.toISOString(), previewUrl: "https://preview.example.com", websiteUrl: "https://site.example.com" });
   await db.project.update({ where: { id: projectId }, data: { stage: "PAID" } });
@@ -188,8 +188,8 @@ test("premier mois refusé bloque la publication ; régularisation, factures, re
   await assert.rejects(sendSiteSubscription(h(), orderId, invite.version + 1), CommercialError);
   await sendSiteSubscription(h(), orderId, invite.version);
   await assert.rejects(sendSiteSubscription(h(), orderId, invite.version), CommercialError);
-  assert.equal(await db.commercialEmail.count({ where: { kind: "SITE_SUBSCRIPTION_INVITE" } }), 1);
-  const mail = unseal((await db.commercialEmail.findFirstOrThrow({ where: { kind: "SITE_SUBSCRIPTION_INVITE" } })).payloadEncrypted!) as { html: string; text: string };
+  assert.equal(await db.commercialEmail.count({ where: { siteOrderId: orderId, kind: "SITE_SUBSCRIPTION_INVITE" } }), 1);
+  const mail = unseal((await db.commercialEmail.findFirstOrThrow({ where: { siteOrderId: orderId, kind: "SITE_SUBSCRIPTION_INVITE" } })).payloadEncrypted!) as { html: string; text: string };
   assert.ok(mail.html.includes("Activer mon abonnement")); assert.ok(mail.text.includes("fin de période payée"));
   assert.equal(subscriptionCount, 0, "Sending must not charge or create a subscription");
   assert.equal((await clientPost(request({ action: "subscribe", agreement: false, version: invite.version }), ctx())).status, 400);
