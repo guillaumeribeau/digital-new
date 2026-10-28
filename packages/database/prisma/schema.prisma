@@ -389,6 +389,8 @@ model Quote {
   access            QuoteAccess[]
   payments          PaymentAttempt[]
   emails            CommercialEmail[]
+  billingInvoices   BillingInvoice[]
+  financialEvents   FinancialEvent[]
   parent            Quote? @relation("QuoteRevisions", fields: [parentId], references: [id], onDelete: Restrict)
   revisions         Quote[] @relation("QuoteRevisions")
   @@index([leadId, createdAt])
@@ -500,9 +502,12 @@ model BillingInvoice {
   siteOrder             SiteOrder? @relation(fields: [siteOrderId], references: [id], onDelete: Restrict)
   @@index([siteOrderId, createdAt])
   @@index([quoteId])
+  quote Quote? @relation(fields: [quoteId], references: [id], onDelete: Restrict)
 }
 
 model CommercialEmail {
+  brand String @default("zelyweb") @db.VarChar(20)
+  @@index([brand, createdAt])
   tadapoOrderId     String? @db.Uuid
   tadapoOrder       TadapoOrder? @relation(fields: [tadapoOrderId], references: [id], onDelete: Restrict)
   id                String @id @default(uuid()) @db.Uuid
@@ -561,6 +566,7 @@ model TadapoOrder {
   nextBillingAt        DateTime? @db.Timestamptz(3)
   billingAlert         Boolean @default(false)
   reviewVersion        Int @default(1)
+  firstVersionAt       DateTime? @db.Timestamptz(3)
   approvedVersion      Int?
   approvedAt           DateTime? @db.Timestamptz(3)
   approvedName         String? @db.VarChar(200)
@@ -573,6 +579,11 @@ model TadapoOrder {
   domainPaidAt         DateTime? @db.Timestamptz(3)
   domainPurchasedAt    DateTime? @db.Timestamptz(3)
   domainReadyAt        DateTime? @db.Timestamptz(3)
+  domainRequest        Json?
+  domainRenewal        Json?
+  domainRenewalHistory Json @default("[]")
+  pendingMail          TadapoMail[]
+  inboundEmails        TadapoInboundEmail[]
   emails               CommercialEmail[]
   invoices             TadapoInvoice[]
   feedback             TadapoFeedback[]
@@ -600,7 +611,43 @@ model TadapoFeedback {
   order     TadapoOrder @relation(fields: [orderId], references: [id], onDelete: Restrict)
   version   Int
   content   String @db.VarChar(10000)
+  kind      String @default("LEGACY") @db.VarChar(20)
+  number    Int?
+  status    String @default("RECORDED") @db.VarChar(20)
+  periodStart DateTime? @db.Timestamptz(3)
+  completedAt DateTime? @db.Timestamptz(3)
   createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@unique([orderId, number])
+  @@index([orderId, kind, periodStart])
+}
+
+// The public Tadapo role may INSERT here, but cannot read commercial mail or owner notifications.
+// The worker transfers each immutable payload into CommercialEmail in one locked transaction.
+model TadapoMail {
+  id String @id @default(uuid()) @db.Uuid
+  orderId String @db.Uuid
+  order TadapoOrder @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  key String @unique @db.VarChar(250)
+  kind String @db.VarChar(40)
+  payloadEncrypted String @db.Text
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  transferredAt DateTime? @db.Timestamptz(3)
+  @@index([transferredAt, createdAt])
+}
+
+model TadapoInboundEmail {
+  id String @id @default(uuid()) @db.Uuid
+  orderId String @db.Uuid
+  order TadapoOrder @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  providerId String @unique @db.VarChar(200)
+  purpose String @db.VarChar(20)
+  state String @db.VarChar(30)
+  sender String @db.VarChar(300)
+  subject String @db.VarChar(300)
+  content String @db.Text
+  attachments Json @default("[]")
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  @@index([orderId, createdAt])
 }
 
 model TadapoFile {
@@ -624,6 +671,8 @@ model CommercialWebhook {
 }
 
 model ServiceTemplate {
+  brand String @default("zelyweb") @db.VarChar(20)
+  @@index([brand])
   id              String @id @default(uuid()) @db.Uuid
   label           String @db.VarChar(200)
   description     String @db.VarChar(2000)
@@ -633,6 +682,8 @@ model ServiceTemplate {
 }
 
 model MessageTemplate {
+  brand String @default("zelyweb") @db.VarChar(20)
+  @@index([brand])
   id      String @id @default(uuid()) @db.Uuid
   label   String @db.VarChar(100)
   subject String @db.VarChar(300)
@@ -741,6 +792,7 @@ model FinancialEvent {
   order         SiteOrder? @relation(fields: [siteOrderId], references: [id], onDelete: Restrict)
   @@index([siteOrderId, createdAt])
   @@index([quoteId, createdAt])
+  quote Quote? @relation(fields: [quoteId], references: [id], onDelete: Restrict)
 }
 
 model ServiceHeartbeat {

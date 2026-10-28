@@ -1,0 +1,11 @@
+ALTER TABLE "ServiceTemplate" ADD COLUMN "brand" VARCHAR(20) NOT NULL DEFAULT 'zelyweb';
+ALTER TABLE "MessageTemplate" ADD COLUMN "brand" VARCHAR(20) NOT NULL DEFAULT 'zelyweb';
+CREATE INDEX "ServiceTemplate_brand_idx" ON "ServiceTemplate"("brand");
+CREATE INDEX "MessageTemplate_brand_idx" ON "MessageTemplate"("brand");
+ALTER TABLE "BillingInvoice" ADD CONSTRAINT "BillingInvoice_quoteId_fkey" FOREIGN KEY ("quoteId") REFERENCES "Quote"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "FinancialEvent" ADD CONSTRAINT "FinancialEvent_quoteId_fkey" FOREIGN KEY ("quoteId") REFERENCES "Quote"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "CommercialEmail" ADD COLUMN "brand" VARCHAR(20) NOT NULL DEFAULT 'zelyweb';
+UPDATE "CommercialEmail" SET "brand" = 'tadapo' WHERE "tadapoOrderId" IS NOT NULL;
+UPDATE "CommercialEmail" e SET "brand" = l."brand" FROM "Quote" q JOIN "Lead" l ON l.id = q."leadId" WHERE e."quoteId" = q.id;
+UPDATE "CommercialEmail" e SET "brand" = l."brand" FROM "ClientMessage" m JOIN "Conversation" c ON c.id = m."conversationId" JOIN "Lead" l ON l.id = c."leadId" WHERE e."messageId" = m.id;
+CREATE INDEX "CommercialEmail_brand_createdAt_idx" ON "CommercialEmail"("brand", "createdAt");

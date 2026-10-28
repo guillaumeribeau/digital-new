@@ -1,11 +1,14 @@
+import { quoteEmailHtml } from "./brand-email";
+import { brandOf, assertBrandContent } from "@nova/shared/brands";
 import { getDb, type CommercialEmail } from "@nova/database";
 import { randomUUID } from "node:crypto";
 import { commercialLocal, CommercialError, emailSchema, publicOrigin, replyAddress, seal, sender, snapshotSchema, unseal } from "./commercial-core";
 import { quotePdf } from "./quote-pdf";
 
 export async function queueQuoteReminder(id: string, manual = false) {
-  const db = getDb(), quote = await db.quote.findUniqueOrThrow({ where: { id } });
+  const db = getDb(), quote = await db.quote.findUniqueOrThrow({ where: { id }, include: { lead: true } });
   if (!["SENT", "ACCEPTED"].includes(quote.status) || (quote.status === "SENT" && quote.validUntil <= new Date())) throw new CommercialError("INVALID_ACTION");
+  const brand = brandOf(quote.lead.brand);
   const snapshot = snapshotSchema.parse(quote.snapshot), pdf = await quotePdf(snapshot);
   await db.$transaction(async (tx) => {
     await tx.$queryRaw`SELECT "id" FROM "Quote" WHERE "id" = ${id}::uuid FOR UPDATE`;
@@ -21,12 +24,14 @@ export async function queueQuoteReminder(id: string, manual = false) {
     if (!access) throw new CommercialError("INVALID_ACTION");
     const conversation = await tx.conversation.findUniqueOrThrow({ where: { leadId: current.leadId } });
     const token = unseal(access.tokenEncrypted); if (typeof token !== "string") throw new CommercialError("INVALID_ACTION");
-    await tx.commercialEmail.create({ data: { quoteId: id, kind: "REMINDER", expiresAt: new Date(Date.now() + 23 * 3600000), payloadEncrypted: seal({ from: sender(), to: [snapshot.buyer.email], reply_to: replyAddress(conversation.replyToken),
-      subject: `Rappel · devis ${quote.number}`, text: `Bonjour ${snapshot.buyer.name},\n\nVotre devis ${quote.number} ${current.status === "ACCEPTED" ? "est accepté et attend son règlement" : "attend votre réponse"}.\n\nConsulter, accepter et payer :\n${publicOrigin()}/client/devis/${id}#token=${token}\n\nVous pouvez répondre à cet e-mail pour toute question.\n\n${snapshot.seller.legalName}`, attachments: [{ filename: `${quote.number}.pdf`, content: pdf.toString("base64") }] }) } });
+    await tx.commercialEmail.create({ data: { brand, quoteId: id, kind: "REMINDER", expiresAt: new Date(Date.now() + 23 * 3600000), payloadEncrypted: seal({ from: sender(brand), to: [snapshot.buyer.email], reply_to: replyAddress(conversation.replyToken, brand),
+      subject: `Rappel · devis ${quote.number}`, html: quoteEmailHtml(brand, snapshot.buyer.name, `Votre devis ${quote.number}`, "Votre devis attend votre réponse ou votre paiement. Retrouvez le document en pièce jointe.", `${publicOrigin(brand)}/client/devis/${id}#token=${token}`), text: `Bonjour ${snapshot.buyer.name},\n\nVotre devis ${quote.number} ${current.status === "ACCEPTED" ? "est accepté et attend son règlement" : "attend votre réponse"}.\n\nConsulter, accepter et payer :\n${publicOrigin(brand)}/client/devis/${id}#token=${token}\n\nVous pouvez répondre à cet e-mail pour toute question.\n\n${snapshot.seller.legalName}`, attachments: [{ filename: `${quote.number}.pdf`, content: pdf.toString("base64") }] }) } });
     await tx.quote.update({ where: { id }, data: { reminderCount: { increment: 1 }, nextReminderAt: null } });
   });
 }
 export async function processCommercialOutbox(limit = 20) {
+  const { transferTadapoMail } = await import("./tadapo-outbox");
+  await transferTadapoMail();
   publicOrigin();
   if (!commercialLocal() && !process.env.RESEND_API_KEY) throw new CommercialError("CONFIGURATION_REQUIRED");
   const db = getDb();
@@ -55,6 +60,14 @@ export async function processCommercialOutbox(limit = 20) {
       const decrypted = unseal(event.payloadEncrypted);
       failureStage = "EMAIL_PAYLOAD_INVALID";
       const payload = emailSchema.parse(decrypted);
+      if(event.tadapoOrderId && event.kind !== 'TADAPO_OWNER_NOTICE'){
+        const order=await db.tadapoOrder.findUniqueOrThrow({where:{id:event.tadapoOrderId},select:{reviewVersion:true,stage:true,project:{select:{stage:true,lead:{select:{deletedAt:true}}}}}});
+        if(order.project?.lead.deletedAt || order.project?.stage==='CANCELLED' || event.kind==='TADAPO_REVIEW_INVITE'&&(Number(payload.headers?.['X-Tadapo-Review-Version'])!==order.reviewVersion || order.stage!=='PREVIEW_SENT')){
+          await db.commercialEmail.updateMany({where:{id:event.id,lockId},data:{status:'CANCELLED',lockId:null,lockedUntil:null}});continue;
+        }
+      }
+      failureStage = "EMAIL_BRAND_MISMATCH";
+      assertBrandContent(brandOf(event.brand), [payload.from, payload.reply_to || "", payload.subject, payload.text, payload.html || ""].join("\n"));
       failureStage = "RESEND_CONNECTION_FAILED";
       const response = await fetch("https://api.resend.com/emails", { method: "POST", headers: { Authorization: "Bearer " + process.env.RESEND_API_KEY, "Content-Type": "application/json", "Idempotency-Key": "nova-commercial/" + event.id }, body: JSON.stringify(payload), signal: AbortSignal.timeout(15000), cache: "no-store" });
       if (!response.ok) { await db.commercialEmail.updateMany({ where: { id: event.id, lockId }, data: { lastHttpStatus: response.status } }); throw new Error(response.status === 401 ? "RESEND_AUTH_INVALID" : response.status === 403 ? "RESEND_FORBIDDEN" : response.status === 429 ? "RESEND_RATE_LIMITED" : response.status === 422 ? "RESEND_PAYLOAD_REJECTED" : "RESEND_UNAVAILABLE"); }

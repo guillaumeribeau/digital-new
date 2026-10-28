@@ -3,6 +3,7 @@ import type { Client } from "pg";
 export async function grantTadapoPermissions(db: Client, role: string) {
   if (!/^[a-z_][a-z0-9_]{0,62}$/i.test(role)) throw new Error("INVALID_RUNTIME_ROLE");
   const r = `"${role}"`;
+  await db.query(`GRANT INSERT ON "TadapoMail" TO ${r}`);
   await db.query(`GRANT USAGE ON SCHEMA public TO ${r}`);
   await db.query(`GRANT SELECT, INSERT, UPDATE ON "TadapoOrder", "TadapoFeedback" TO ${r}`);
   await db.query(`GRANT SELECT ON "TadapoInvoice" TO ${r}`);

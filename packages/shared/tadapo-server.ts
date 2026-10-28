@@ -1,11 +1,15 @@
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
+import { assertBrandContent } from "./brands";
 import Stripe from "stripe";
 import { z } from "zod";
 import { getDb, Prisma, type TadapoOrder } from "@nova/database";
 import { tadapoBriefSchema } from "@nova/validation/tadapo";
 import { tadapoAgreement, tadapoAnniversary, tadapoOffer, tadapoOfferVersion, type TadapoOffer } from "./tadapo";
 import { seal, unseal } from "./secure-payload";
-import termsArchive from "./tadapo-terms-2026-10-23.json";
+import termsArchive from "./tadapo-terms-v6-2026-10-28.json";
+import { queueTadapoEmail, queueTadapoDomainInvite, queueTadapoOwner, tadapoPaymentMessage } from "./tadapo-mail";
+import { tadapoClientAction, tadapoReviewState, tadapoBillingWindow } from "./tadapo-workflow";
+export { queueTadapoEmail } from "./tadapo-mail";
 
 export class TadapoError extends Error {}
 export const digestTadapo = (value: string) => createHash("sha256").update(value).digest("hex");
@@ -15,17 +19,18 @@ export function tadapoOrigin() {
   return url.origin;
 }
 export function tadapoMode() {
-  const key = process.env.STRIPE_SECRET_KEY || "";
+  const key = process.env.TADAPO_STRIPE_SECRET_KEY || "";
   if (key.startsWith("sk_test_")) return "TEST";
   if (key.startsWith("sk_live_")) return "LIVE";
   throw new TadapoError("ORDERING_NOT_OPEN");
 }
 export function tadapoStripe() {
-  tadapoMode(); return new Stripe(process.env.STRIPE_SECRET_KEY!, { timeout: 10000, maxNetworkRetries: 1, httpClient: Stripe.createFetchHttpClient() });
+  tadapoMode(); return new Stripe(process.env.TADAPO_STRIPE_SECRET_KEY!, { timeout: 10000, maxNetworkRetries: 1, httpClient: Stripe.createFetchHttpClient() });
 }
 export function tadapoSender() {
   const from = process.env.TADAPO_FROM_EMAIL, reply = process.env.TADAPO_CONTACT_EMAIL;
   if (!from || !reply || !z.email().safeParse(reply).success || !process.env.RESEND_API_KEY) throw new TadapoError("EMAIL_NOT_CONFIGURED");
+  try { assertBrandContent("tadapo", from + " " + reply); } catch { throw new TadapoError("EMAIL_NOT_CONFIGURED"); }
   return { from, reply_to: reply };
 }
 export const tadapoCheckoutSchema = z.object({
@@ -36,14 +41,6 @@ export function tadapoClientLink(order: TadapoOrder) {
   const token = unseal(order.tokenEncrypted);
   if (typeof token !== "string") throw new TadapoError("INVALID_TOKEN");
   return `${tadapoOrigin()}/suivi/${order.id}#token=${token}`;
-}
-export async function queueTadapoEmail(tx: Prisma.TransactionClient, order: TadapoOrder, kind: string, subject: string, message: string, requestId?: string) {
-  const brief = tadapoBriefSchema.parse(order.brief);
-  const consent = order.consentSnapshot as { termsHtml?: string };
-  return tx.commercialEmail.create({ data: { tadapoOrderId: order.id, kind, manualRequestId: requestId,
-    expiresAt: new Date(Date.now() + 23 * 3600000), payloadEncrypted: seal({ ...tadapoSender(), to: [brief.email], subject,
-      text: `Bonjour ${brief.fullName},\n\n${message}\n\nVotre lien personnel : ${tadapoClientLink(order)}\n\nRépondez à cet e-mail pour transmettre vos contenus ou poser une question.\nTadapo · Guillaume Ribeau EI`,
-      ...(kind === "TADAPO_PAYMENT" && consent.termsHtml ? { attachments: [{ filename: "conditions-tadapo-acceptees.html", content: Buffer.from(consent.termsHtml).toString("base64") }] } : {}) }) } });
 }
 /** A request id permanently identifies one accepted offer. A retry reuses the same Stripe session. */
 export async function checkoutTadapo(input: unknown) {
@@ -96,7 +93,13 @@ export async function authorizeTadapo(id: string, token: string | null) {
 export async function tadapoPublicView(id: string, token: string | null) {
   const o = await authorizeTadapo(id, token);
   const invoices = await getDb().tadapoInvoice.findMany({ where: { orderId: id }, orderBy: { createdAt: "desc" }, take: 50 });
-  return { id: o.id, stage: o.stage, offer: o.offerSnapshot, paid: !!o.paidAt, contentComplete: !!o.contentCompleteAt,
+  const state = await tadapoReviewState(getDb(), o);
+  const period = o.paidAt ? tadapoBillingWindow(o.paidAt) : null;
+  const requests = await getDb().tadapoFeedback.findMany({where:{orderId:id},orderBy:{createdAt:'asc'},select:{id:true,kind:true,number:true,version:true,content:true,status:true,periodStart:true,createdAt:true,completedAt:true}});
+  return { firstVersionAt:o.firstVersionAt, reviewDeadline:state.deadline, reviewExpired:!!state.deadline&&state.deadline.getTime()<Date.now(), reviewWaiting:state.waiting, reviewCount:state.rounds.length,
+    domainRequest:o.domainRequest, domainRenewal:o.domainRenewal, requests,
+    monthlyPeriodEnd:period?.end, monthlyUsed:requests.filter(r=>r.kind==='MONTHLY'&&r.periodStart?.getTime()===period?.start.getTime()).length,
+    id: o.id, stage: o.stage, offer: o.offerSnapshot, paid: !!o.paidAt, contentComplete: !!o.contentCompleteAt,
     previewUrl: o.project?.previewUrl, websiteUrl: o.project?.websiteUrl, reviewVersion: o.reviewVersion,
     approved: o.approvedVersion === o.reviewVersion, subscriptionStatus: o.subscriptionStatus, billingAlert: o.billingAlert,
     commitmentEndAt: o.commitmentEndAt, cancelRequestedAt: o.cancelRequestedAt, cancelEffectiveAt: o.cancelEffectiveAt,
@@ -165,9 +168,16 @@ export async function applyTadapoStripeEvent(event: Stripe.Event) {
       const project = await tx.project.create({ data: { leadId: lead.id, stage: "CONTENT_PREPARATION", stripeCustomerId: update.stripeCustomerId } });
       o = await tx.tadapoOrder.update({ where: { id: o.id }, data: { ...update, paidAt: start, projectId: project.id, stage: "CONTENT_PREPARATION",
         commitmentEndAt: offer.minimumMonths ? tadapoAnniversary(start, offer.minimumMonths) : null } });
-      const consent = o.consentSnapshot as { agreement?: string; earlyStart?: boolean; earlyStartText?: string };
-      await queueTadapoEmail(tx, o, "TADAPO_PAYMENT", "Votre commande Tadapo est confirmée", `Votre premier mois a été réglé.\n\n${consent.agreement}\n\nDémarrage anticipé demandé : ${consent.earlyStart ? "oui" : "non"}. ${consent.earlyStartText}\n\nConditions : ${tadapoOrigin()}/conditions-generales\n\nEnvoyez votre logo, vos photos et vos textes en réponse. La première version est prévue sous 72 h ouvrées après dossier complet et paiement. Vos factures sont accessibles par votre lien personnel.`);
-    } else await tx.tadapoOrder.update({ where: { id: o.id }, data: update });
+      await queueTadapoEmail(tx, o, "TADAPO_PAYMENT", "Votre commande Tadapo est confirmée", tadapoPaymentMessage(o));
+      await queueTadapoDomainInvite(tx, o);
+      await queueTadapoOwner(tx, o, 'PAYMENT', 'Nouvelle commande Tadapo payée', 'Le premier mois est confirmé. Le questionnaire est conservé dans le dossier. Le client a reçu deux e-mails séparés : confirmation et choix du domaine.');
+    } else o = await tx.tadapoOrder.update({ where: { id: o.id }, data: update });
+    if (invoice && ['invoice.payment_failed','invoice.payment_action_required'].includes(event.type) && invoice.status !== 'paid' && o.billingAlert) {
+      await queueTadapoOwner(tx,o,'invoice-failed/'+invoice.id,'Paiement Tadapo à régulariser','Facture : '+invoice.id+'. Consultez Stripe avant toute intervention. Aucune suspension automatique.');
+      await queueTadapoEmail(tx,o,'TADAPO_PAYMENT_FAILED','Votre abonnement Tadapo : paiement à régulariser','Un paiement nécessite votre intervention. Consultez la facture et mettez à jour votre moyen de paiement depuis votre lien personnel.',undefined,'billing','invoice-failed/'+invoice.id);
+    }
+    if (invoice?.status === 'paid' && event.type === 'invoice.paid') await queueTadapoOwner(tx,o,'invoice-paid/'+invoice.id,'Facture Tadapo réglée','Montant : '+(invoice.total/100).toFixed(2)+' € TTC. Référence : '+invoice.id+'.');
+    if (sub.status === 'canceled') await queueTadapoOwner(tx,o,'subscription-ended/'+sub.id,'Abonnement Tadapo terminé','L’abonnement est terminé. Consultez le dossier et Stripe avant toute intervention sur le site.');
     if (invoice) await tx.tadapoInvoice.upsert({ where: { id: invoice.id }, create: { id: invoice.id, orderId: o.id, amountCents: invoice.total, status: invoice.status || "draft", hostedUrl: invoice.hosted_invoice_url, pdfUrl: invoice.invoice_pdf, periodEnd: new Date(invoice.period_end * 1000) }, update: { status: invoice.status || "draft", hostedUrl: invoice.hosted_invoice_url, pdfUrl: invoice.invoice_pdf } });
     await tx.commercialWebhook.create({ data: { key, provider: "stripe" } });
   });
@@ -183,7 +193,12 @@ export async function cancelTadapo(id: string, token: string | null) {
   if (!periodEnd) throw new TadapoError("INVALID_ACTION");
   const end = Math.max(periodEnd, Math.floor((order.commitmentEndAt?.getTime() || 0) / 1000));
   await stripe.subscriptions.update(sub.id, { cancel_at: end, proration_behavior: "none" }, { idempotencyKey: `tadapo/cancel/${id}/${end}` });
-  await getDb().tadapoOrder.update({ where: { id }, data: { cancelRequestedAt: order.cancelRequestedAt || new Date(), cancelEffectiveAt: new Date(end * 1000) } });
+  await getDb().$transaction(async tx => {
+    const o=await tx.tadapoOrder.update({ where: { id }, data: { cancelRequestedAt: order.cancelRequestedAt || new Date(), cancelEffectiveAt: new Date(end * 1000) } });
+    const message='Votre demande de résiliation est enregistrée. Fin prévue le '+new Date(end*1000).toLocaleDateString('fr-FR',{timeZone:'Europe/Paris'})+'. Les échéances prévues jusqu’à cette date restent dues.';
+    await queueTadapoEmail(tx,o,'TADAPO_CANCELLATION','Votre demande de résiliation Tadapo',message,undefined,'billing','cancel/'+end);
+    await queueTadapoOwner(tx,o,'cancel/'+end,'Résiliation Tadapo demandée',message);
+  });
 }
 
 export async function tadapoPaymentMethodLink(id: string, token: string | null) {
@@ -195,19 +210,4 @@ export async function tadapoPaymentMethodLink(id: string, token: string | null) 
   return (await stripe.billingPortal.sessions.create({ customer: order.stripeCustomerId, configuration: configuration.id, return_url: tadapoClientLink(order), flow_data: { type: "payment_method_update" } })).url;
 }
 
-export async function tadapoFeedback(id: string, token: string | null, input: unknown) {
-  await authorizeTadapo(id, token);
-  const data = z.object({ action: z.enum(["approve", "feedback"]), version: z.number().int().min(1), requestId: z.uuid(), name: z.string().trim().min(2).max(200), message: z.string().trim().max(10000).default("") }).strict().parse(input);
-  await getDb().$transaction(async tx => {
-    await tx.$queryRaw`SELECT "id" FROM "TadapoOrder" WHERE "id" = ${id}::uuid FOR UPDATE`;
-    const o = await tx.tadapoOrder.findUniqueOrThrow({ where: { id } });
-    if (!o.paidAt || !["PREVIEW_SENT", "REVIEW", "APPROVED"].includes(o.stage) || o.reviewVersion !== data.version) throw new TadapoError("INVALID_ACTION");
-    const content = data.action === "approve" ? `Validation par ${data.name}` : data.message;
-    const previous = await tx.tadapoFeedback.findUnique({ where: { requestId: data.requestId } });
-    if (previous) { if (previous.orderId !== id || previous.content !== content || previous.version !== data.version) throw new TadapoError("REQUEST_CONFLICT"); return; }
-    if (data.action === "feedback" && data.message.length < 2) throw new TadapoError("MESSAGE_REQUIRED");
-    await tx.tadapoFeedback.create({ data: { requestId: data.requestId, orderId: id, version: data.version, content } });
-    await tx.tadapoOrder.update({ where: { id }, data: data.action === "approve" ? { stage: "APPROVED", approvedAt: new Date(), approvedVersion: data.version, approvedName: data.name } : { stage: "REVIEW", approvedAt: null, approvedVersion: null, approvedName: null } });
-    await tx.project.update({ where: { id: o.projectId! }, data: { stage: data.action === "approve" ? "APPROVED" : "REVIEW" }, select: { id: true } });
-  });
-}
+export const tadapoFeedback = tadapoClientAction;

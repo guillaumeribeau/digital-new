@@ -36,7 +36,7 @@ const invoice = () => ({ id: invoiceId, object: "invoice", customer: customerId,
 const subscription = () => ({ id: subId, object: "subscription", livemode: false, customer: customerId, status: subStatus, cancel_at_period_end: cancelAtEnd, metadata: subscriptionMeta, latest_invoice: invoice(), items: { data: [{ quantity: 1, price: { unit_amount: 2900, currency: "eur", recurring: { interval: "month", interval_count: 1 } } }] } });
 async function stripeEvent(type: string, object: unknown, eventId = "evt_" + randomUUID()) {
   const payload = JSON.stringify({ id: eventId, object: "event", type, livemode: false, data: { object } });
-  return webhook(new Request("http://localhost:3001/api/webhooks/stripe", { method: "POST", headers: { "stripe-signature": stripeClient().webhooks.generateTestHeaderString({ payload, secret: process.env.STRIPE_WEBHOOK_SECRET! }) }, body: payload }));
+  return webhook(new Request("http://localhost:3001/api/webhooks/stripe", { method: "POST", headers: { "stripe-signature": stripeClient().webhooks.generateTestHeaderString({ payload, secret: process.env.ZELYWEB_STRIPE_WEBHOOK_SECRET! }) }, body: payload }));
 }
 function request(body?: unknown, privateToken = token) {
   return new NextRequest(`http://localhost:3001/api/client/sites/${orderId}`, { method: body ? "POST" : "GET", headers: { cookie: `${siteCookie(orderId)}=${privateToken}`, origin: "http://localhost:3001", "content-type": "application/json" }, ...(body ? { body: JSON.stringify(body) } : {}) });
@@ -66,7 +66,7 @@ test("présentation privée, aperçu HTML, prix figé, accès et consentement ob
   await leadRepository.verify(payload.text.match(/#token=([A-Za-z0-9_-]+)/)![1]);
   await adminService.changeLeadStatus(h(), { id: lead.reference, expected: "NEW", status: "QUALIFIED" });
   projectId = await adminService.convert(h(), lead.reference);
-  Object.assign(process.env, { STRIPE_SECRET_KEY: "sk_test_fixture_only", STRIPE_WEBHOOK_SECRET: "whsec_billing_fixture" });
+  Object.assign(process.env, { ZELYWEB_STRIPE_SECRET_KEY: "sk_test_fixture_only", ZELYWEB_STRIPE_WEBHOOK_SECRET: "whsec_billing_fixture" });
   const image = await sharp({ create: { width: 900, height: 600, channels: 3, background: "#2454ff" } }).jpeg().toBuffer();
   const input = { projectId, expectedVersion: 0, previewUrl: "https://preview.example.com", message: "Votre première version <script>alert(1)</script> est prête.", creationPrice: "350,00", screenshot: "data:image/jpeg;base64," + image.toString("base64") };
   const saved = await saveSitePresentation(h(), input); orderId = saved.id;

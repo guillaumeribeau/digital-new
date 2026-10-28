@@ -27,6 +27,6 @@ export async function lookupDomain(input: string, request: typeof fetch = fetch)
 /** Use only an approved EUR quote; USD search results are never treated as euros. */
 export function domainContribution(plan: TadapoPlan, domain: string, actualHtCents: number) {
   if (!Number.isSafeInteger(actualHtCents) || actualHtCents < 0 || !domainName.safeParse(domain).success) throw new Error("INVALID_DOMAIN_QUOTE");
-  const cap = /\.(fr|com)$/i.test(domain) ? tadapoPlans[plan].domainAnnualCapCents : 0;
+  const cap = tadapoPlans[plan].domainAnnualCapCents;
   return { actualHtCents, includedHtCents: Math.min(actualHtCents, cap), extraHtCents: Math.max(0, actualHtCents - cap) };
 }

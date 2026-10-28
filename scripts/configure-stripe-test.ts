@@ -4,7 +4,7 @@ import Stripe from "stripe";
 import { stripeEvents } from "../apps/admin/lib/stripe-events";
 async function main() {
   loadEnvConfig(resolve("apps/admin"));
-  const key = process.env.STRIPE_SECRET_KEY;
+  const key = process.env.ZELYWEB_STRIPE_SECRET_KEY ?? process.env.STRIPE_SECRET_KEY;
   if (!key?.startsWith("sk_test_")) throw new Error("TEST_KEY_REQUIRED");
   const stripe = new Stripe(key, { timeout: 15000, maxNetworkRetries: 1 });
   const matches = (await stripe.webhookEndpoints.list({ limit: 100 })).data.filter(e => e.url === "https://admin-production-1a67.up.railway.app/api/webhooks/stripe" && !e.livemode);

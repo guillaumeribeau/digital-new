@@ -32,7 +32,7 @@ async function main() {
   } catch (error) { await db.query("ROLLBACK"); throw error; } finally { await db.end(); }
   const key = previousKey || randomBytes(32).toString("base64");
   const values = { COMMERCIAL_MODE: "local", COMMERCIAL_PUBLIC_URL: "http://localhost:3001", COMMERCIAL_ENCRYPTION_KEY: key,
-    COMMERCIAL_FROM_EMAIL: "", COMMERCIAL_REPLY_DOMAIN: "", RESEND_API_KEY: "", RESEND_WEBHOOK_SECRET: "", STRIPE_SECRET_KEY: "", STRIPE_WEBHOOK_SECRET: "" };
+    COMMERCIAL_FROM_EMAIL: "", COMMERCIAL_REPLY_DOMAIN: "", RESEND_API_KEY: "", RESEND_WEBHOOK_SECRET: "", ZELYWEB_STRIPE_SECRET_KEY: "", ZELYWEB_STRIPE_WEBHOOK_SECRET: "" };
   for (const app of ["admin", "website"]) {
     const path = resolve(root, `apps/${app}/.env.local`); let text = await readFile(path, "utf8");
     for (const [name, value] of Object.entries(values)) {

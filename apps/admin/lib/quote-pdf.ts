@@ -1,3 +1,4 @@
+import { brands } from "@nova/shared/brands";
 import { PDFDocument, rgb } from "pdf-lib";
 import fontkit from "@pdf-lib/fontkit";
 import { readFile } from "node:fs/promises";
@@ -23,12 +24,13 @@ export async function quotePdf(value: unknown) {
   const face = await pdf.embedFont(await font(), { subset: true });
   pdf.setTitle(`Devis ${quote.number}`); pdf.setAuthor(quote.seller.legalName);
   pdf.setCreationDate(new Date(quote.createdAt)); pdf.setModificationDate(new Date(quote.createdAt));
-  const logo = await pdf.embedPng(await asset("zelyweb-logo.png"));
-  const ink = rgb(.07, .10, .16), blue = rgb(.14, .33, 1), muted = rgb(.43, .48, .56);
+  const logo = quote.brand === "zelyweb" ? await pdf.embedPng(await asset("zelyweb-logo.png")) : undefined;
+  const ink = rgb(.07, .10, .16), blue = quote.brand === "tadapo" ? rgb(.88, .36, .16) : rgb(.14, .33, 1), muted = rgb(.43, .48, .56);
   let page = pdf.addPage([595.28, 841.89]), y = 726;
   const pages = [page];
   function header() {
-    page.drawImage(logo, { x: 48, y: 767, width: 144, height: 48 });
+    if (logo) page.drawImage(logo, { x: 48, y: 767, width: 144, height: 48 });
+    else page.drawText("tadapo.", { x: 48, y: 778, size: 32, font: face, color: blue });
     page.drawText("DEVIS COMPLÉMENTAIRE", { x: 315, y: 791, size: 14, font: face, color: blue });
     page.drawText(quote.number, { x: 315, y: 773, size: 10, font: face, color: muted });
     page.drawLine({ start: { x: 52, y: 750 }, end: { x: 543, y: 750 }, thickness: 1, color: rgb(.88, .91, .96) });
@@ -91,7 +93,7 @@ export async function quotePdf(value: unknown) {
   pages.forEach((p, i) => {
     p.drawLine({ start: { x: 52, y: 48 }, end: { x: 543, y: 48 }, thickness: .5, color: rgb(.88, .91, .96) });
     p.drawText(`${quote.number} · ${i + 1}/${pages.length}`, { x: 52, y: 30, size: 8, font: face, color: muted });
-    p.drawText("zelyweb.com", { x: 475, y: 30, size: 8, font: face, color: blue });
+    p.drawText(brands[quote.brand].domain, { x: 475, y: 30, size: 8, font: face, color: blue });
   });
   return Buffer.from(await pdf.save());
 }

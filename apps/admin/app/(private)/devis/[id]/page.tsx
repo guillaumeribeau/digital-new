@@ -1,6 +1,6 @@
+import { workspaceDb } from "../../../../lib/brand-context";
 import { requireAdmin } from "../../../../lib/access";
 import Link from "next/link";
-import { getDb } from "@nova/database";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { z } from "zod";
@@ -14,7 +14,7 @@ export default async function QuoteDetail({ params }: { params: Promise<{ id: st
   const { id } = await params; if (!z.uuid().safeParse(id).success) notFound();
   const h = await headers(), quote = await commercialService.quote(h, id); if (!quote) notFound();
   const settings = await commercialService.settings(h), items = snapshotSchema.shape.items.parse(quote.items);
-  const invoices = await getDb().billingInvoice.findMany({ where: { quoteId: id }, orderBy: { createdAt: "desc" } });
+  const invoices = await workspaceDb(await headers()).billingInvoice.findMany({ where: { quoteId: id }, orderBy: { createdAt: "desc" } });
   const issuerReady = !!(settings?.legalName && settings?.address && settings?.registrationNumber);
   return <><Link className="back-link" href={`/clients/${quote.leadId}`}>← {quote.lead.businessName}</Link><PageTitle eyebrow={quote.number} title={quote.title} description={`${quote.lead.fullName} · ${quoteStatuses[quote.status]}`} action={quote.status === "DRAFT" ? <Link className="button secondary" href={`/devis/nouveau?client=${quote.leadId}&modifier=${id}`}>Modifier le brouillon</Link> : !["ACCEPTED", "PAID", "COMPLETED"].includes(quote.status) ? <Link className="button secondary" href={`/devis/nouveau?client=${quote.leadId}&revision=${id}`}>Créer une nouvelle version</Link> : undefined} />
     <div className="detail-grid"><div className="detail-stack"><section className="panel"><h2>Les prestations</h2><div className="table-scroll"><table><thead><tr><th>Prestation</th><th>Quantité</th><th>Prix HT</th><th>TVA</th><th>Total TTC</th></tr></thead><tbody>{items.map((item, i) => <tr key={i}><td><strong>{item.label}</strong><small>{item.description}</small></td><td>{item.quantity}</td><td>{money(item.unitCents)}</td><td>{item.taxBasisPoints / 100} %</td><td>{money(item.totalCents)}</td></tr>)}</tbody></table></div><p className="quote-total">Total TTC <strong>{money(quote.totalCents)}</strong></p><p className="info-line">HT : {money(quote.subtotalCents)} · TVA : {money(quote.taxCents)}</p>

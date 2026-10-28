@@ -38,7 +38,7 @@ export async function siteBillingAction(_previous: SiteBillingResult, form: Form
       IMMUTABLE_QUOTE: "Cette proposition a déjà été envoyée. Son prix et son contenu sont figés. Rechargez la fiche pour consulter son suivi.",
       STALE_QUOTE: "La proposition a changé ou a déjà été envoyée. Rechargez la fiche avant de réessayer.",
       INVALID_AMOUNT: "Saisissez un prix de création compris entre 1 et 100 000 € HT, avec deux décimales au maximum.",
-      CONFIGURATION_REQUIRED: "La configuration commerciale est incomplète ou le mode Stripe ne correspond pas à la proposition. Vérifiez STRIPE_SECRET_KEY, COMMERCIAL_MODE, COMMERCIAL_PUBLIC_URL, COMMERCIAL_FROM_EMAIL et COMMERCIAL_ENCRYPTION_KEY dans le service admin.",
+      CONFIGURATION_REQUIRED: "La configuration commerciale est incomplète ou le mode Stripe ne correspond pas à la proposition. Vérifiez ZELYWEB_STRIPE_SECRET_KEY, COMMERCIAL_MODE, COMMERCIAL_PUBLIC_URL, COMMERCIAL_FROM_EMAIL et COMMERCIAL_ENCRYPTION_KEY dans le service admin.",
       PAYMENT_REQUIRED: "Le paiement de création et l’accord du client sont requis. Pour préparer l’e-mail d’abonnement, renseignez aussi l’URL définitive HTTPS du site.",
       REVISION_EMAIL_SENT: "L’e-mail d’ajustements a déjà été envoyé ou le projet est passé à l’abonnement. Rechargez la fiche pour consulter son suivi.",
       SUBSCRIPTION_INVITED: "L’invitation a déjà été envoyée ou l’abonnement est déjà démarré. Rechargez la fiche pour consulter son suivi.",

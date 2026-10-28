@@ -48,7 +48,7 @@ Fournir aux services uniquement leurs URL privées restreintes. Ne pas recopier 
 - `NEXT_SERVER_ACTIONS_ENCRYPTION_KEY` : nouvelle clé stable de 32 octets en base64.
 - `COMMERCIAL_PUBLIC_URL` : même origine que l’admin.
 - `COMMERCIAL_ENCRYPTION_KEY` : nouvelle clé stable de 32 octets en base64, à partager avec le futur worker.
-- Laisser `COMMERCIAL_MODE`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `RESEND_API_KEY` et `RESEND_WEBHOOK_SECRET` vides tant que ces services ne sont pas configurés.
+- Laisser `COMMERCIAL_MODE`, `ZELYWEB_STRIPE_SECRET_KEY`, `ZELYWEB_STRIPE_WEBHOOK_SECRET`, `RESEND_API_KEY` et `RESEND_WEBHOOK_SECRET` vides tant que ces services ne sont pas configurés.
 
 **Site :**
 

@@ -1,19 +1,20 @@
+import { type Brand } from "@nova/shared/brands";
 import { getDb } from "@nova/database";
 import { NextRequest } from "next/server";
 import { z } from "zod";
-import { CommercialError, digest, publicOrigin } from "./commercial-core";
+import { CommercialError, digest, publicOrigin, snapshotSchema } from "./commercial-core";
 
-export const quoteCookie = (id: string) => "nova-quote-" + id;
-export async function clientQuote(request: NextRequest, id: string) {
+export const quoteCookie = (id: string, brand: Brand = "zelyweb") => brand + "-quote-" + id;
+export async function clientQuote(request: NextRequest, id: string, brand: Brand = "zelyweb") {
   z.uuid().parse(id);
-  const token = request.cookies.get(quoteCookie(id))?.value;
+  const token = request.cookies.get(quoteCookie(id, brand))?.value;
   if (!token || !/^[A-Za-z0-9_-]{43}$/.test(token)) throw new CommercialError("CLIENT_ACCESS_DENIED");
-  const access = await getDb().quoteAccess.findFirst({ where: { quoteId: id, tokenHash: digest(token), revokedAt: null, expiresAt: { gt: new Date() } }, include: { quote: true } });
-  if (!access || ["DRAFT", "CANCELLED", "SUPERSEDED"].includes(access.quote.status)) throw new CommercialError("CLIENT_ACCESS_DENIED");
+  const access = await getDb().quoteAccess.findFirst({ where: { quoteId: id, tokenHash: digest(token), revokedAt: null, expiresAt: { gt: new Date() } }, include: { quote: { include: { lead: true } } } });
+  if (!access || access.quote.lead.brand !== brand || snapshotSchema.parse(access.quote.snapshot).brand !== brand || ["DRAFT", "CANCELLED", "SUPERSEDED"].includes(access.quote.status)) throw new CommercialError("CLIENT_ACCESS_DENIED");
   return access.quote;
 }
-export async function clientBody(request: NextRequest) {
-  if (request.headers.get("origin") !== publicOrigin()) throw new CommercialError("CLIENT_ACCESS_DENIED");
+export async function clientBody(request: NextRequest, brand: Brand = "zelyweb") {
+  if (request.headers.get("origin") !== publicOrigin(brand)) throw new CommercialError("CLIENT_ACCESS_DENIED");
   if (!/^application\/json(?:\s*;|$)/i.test(request.headers.get("content-type") || "")) throw new CommercialError("INVALID_ACTION");
   const reader = request.body?.getReader(); let length = 0; const chunks: Uint8Array[] = [];
   if (reader) while (true) {

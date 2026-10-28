@@ -3,6 +3,7 @@ import { Resend } from "resend";
 import { z } from "zod";
 import { CommercialError } from "./commercial-core";
 import { applySiteInbound, receivingApiKey } from "./site-inbound";
+import { applyTadapoInbound } from "./tadapo-inbound";
 
 export async function boundedText(request: Pick<Request, "headers" | "body">, max = 1000000) {
   if (Number(request.headers.get("content-length") || 0) > max) throw new CommercialError("INVALID_ACTION");
@@ -28,20 +29,20 @@ export async function applyResendEvent(key: string, payload: ReturnType<Resend["
     if (!response.ok) throw new CommercialError("CONFIGURATION_REQUIRED");
     const email = inboundSchema.parse(JSON.parse(await boundedText(response)));
     if (email.id !== emailId) throw new CommercialError("INVALID_ACTION");
-    if (await applySiteInbound(email)) {
+    if (await applyTadapoInbound(email) || await applySiteInbound(email)) {
       await db.commercialWebhook.upsert({ where: { key }, create: { key, provider: "RESEND" }, update: {} });
       return;
     }
-    let target: string | undefined;
+    let target: string | undefined, targetDomain: string | undefined;
     for (const recipient of email.to) {
       const match = address(recipient).match(/^r-([a-f0-9]{48})@(.+)$/);
-      if (match && match[2] === process.env.COMMERCIAL_REPLY_DOMAIN?.toLowerCase()) { target = match[1]; break; }
+      if (match && [process.env.COMMERCIAL_REPLY_DOMAIN, process.env.TADAPO_REPLY_DOMAIN].filter(Boolean).some(d => match[2] === d!.toLowerCase())) { target = match[1]; targetDomain = match[2]; break; }
     }
-    const conversation = target ? await db.conversation.findUnique({ where: { replyToken: target }, include: { lead: { select: { email: true } } } }) : null;
+    const conversation = target ? await db.conversation.findUnique({ where: { replyToken: target }, include: { lead: { select: { email: true, brand: true } } } }) : null;
     const text = email.text || (email.html || "").slice(0, 200000).replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, "").replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, "").replace(/<[^>]*>/g, " ");
     await db.$transaction(async (tx) => {
       if (await tx.commercialWebhook.findUnique({ where: { key } })) return;
-      if (conversation) {
+      if (conversation && targetDomain === (conversation.lead.brand === "tadapo" ? process.env.TADAPO_REPLY_DOMAIN : process.env.COMMERCIAL_REPLY_DOMAIN)?.toLowerCase()) {
         const inserted = await tx.clientMessage.createMany({ skipDuplicates: true, data: [{ conversationId: conversation.id, direction: "INBOUND", subject: email.subject || "Réponse client", content: text.slice(0, 20000) || "Message sans contenu texte. Consultez les pièces jointes.",
           sender: email.from, providerId: email.id, smtpMessageId: email.message_id,
           attachments: email.attachments.map((file) => ({ id: file.id, filename: file.filename || "Pièce jointe", contentType: file.content_type || "application/octet-stream" })),

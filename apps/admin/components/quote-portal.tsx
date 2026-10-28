@@ -1,33 +1,35 @@
 "use client";
 import { BrandLogo } from "./brand-logo";
+import { type Brand } from "@nova/shared/brands";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { QuoteSnapshot } from "../lib/commercial-core";
 import { money } from "../lib/commercial-shared";
 
 type PortalQuote = { status: string; snapshot: QuoteSnapshot; documentHash: string; paymentMode: string; paymentStatus?: string; acceptedName?: string; paidAt?: string };
-export function QuotePortal({ id }: { id: string }) {
+export function QuotePortal({ id, brand = "zelyweb" }: { id: string; brand?: Brand }) {
+  const api = brand === "tadapo" ? "/api/client/tadapo/quotes" : "/api/client/quotes";
   const token = useRef("");
   const [quote, setQuote] = useState<PortalQuote>();
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const load = useCallback(async () => {
-    const response = await fetch(`/api/client/quotes/${id}`, { cache: "no-store" });
+    const response = await fetch(`${api}/${id}`, { cache: "no-store" });
     const data = await response.json(); if (!response.ok) throw new Error(data.error);
     setQuote(data);
-  }, [id]);
+  }, [id, api]);
   useEffect(() => {
     token.current ||= new URLSearchParams(window.location.hash.slice(1)).get("token") || "";
     window.history.replaceState(null, "", window.location.pathname + window.location.search);
     void (async () => {
       try {
         if (token.current) {
-          const response = await fetch("/api/client/quotes/access", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, token: token.current }) });
+          const response = await fetch(`${api}/access`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, token: token.current }) });
           const data = await response.json(); if (!response.ok) throw new Error(data.error);
         }
         await load();
       } catch (error) { setError(error instanceof Error ? error.message : "Le devis est indisponible."); }
     })();
-  }, [id, load]);
+  }, [id, api, load]);
   const awaitingPayment = quote?.status === "ACCEPTED" && !["FAILED", "EXPIRED"].includes(quote.paymentStatus || "") && typeof window !== "undefined" && new URLSearchParams(window.location.search).get("retour") === "paiement";
   useEffect(() => {
     if (!awaitingPayment) return;
@@ -38,21 +40,21 @@ export function QuotePortal({ id }: { id: string }) {
   async function perform(action: string, values: Record<string, unknown> = {}) {
     setBusy(true); setError("");
     try {
-      const response = await fetch(`/api/client/quotes/${id}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, ...values }) });
+      const response = await fetch(`${api}/${id}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, ...values }) });
       const data = await response.json(); if (!response.ok) throw new Error(data.error);
       if (data.url) window.location.assign(data.url); else await load();
     } catch (error) { setError(error instanceof Error ? error.message : "L’opération est indisponible."); }
     finally { setBusy(false); }
   }
   const snapshot = quote?.snapshot;
-  return <main id="main" className="quote-portal"><header><div className="brand-logo"><BrandLogo /></div><span className="eyebrow">VOTRE DEVIS COMPLÉMENTAIRE</span></header>
+  return <main id="main" className="quote-portal"><header><div className="brand-logo">{brand === "tadapo" ? <span style={{ color: "#e15b2a", fontSize: 30, fontWeight: 800 }}>tadapo.</span> : <BrandLogo />}</div><span className="eyebrow">VOTRE DEVIS COMPLÉMENTAIRE</span></header>
     {error && <p className="notice error" role="alert">{error}</p>}
     {!snapshot ? !error && <p>Chargement de votre devis…</p> : <>
       <section className="panel"><p className="eyebrow">{snapshot.number}</p><h1>{snapshot.title}</h1><p>{snapshot.seller.legalName} · Pour {snapshot.buyer.company}</p>
         <p className="info-line">Valable jusqu’au {new Date(snapshot.validUntil).toLocaleDateString("fr-FR", { timeZone: "Europe/Paris" })} · {snapshot.deliveryTime}</p>
         <div className="table-scroll"><table><thead><tr><th>Prestation</th><th>Quantité</th><th>Prix HT</th><th>TVA</th><th>Total TTC</th></tr></thead><tbody>{snapshot.items.map((item, index) => <tr key={index}><td><strong>{item.label}</strong><small>{item.description}</small></td><td>{item.quantity}</td><td>{money(item.unitCents)}</td><td>{item.taxBasisPoints / 100} %</td><td>{money(item.totalCents)}</td></tr>)}</tbody></table></div>
         <p className="quote-total">Total TTC <strong>{money(snapshot.totalCents)}</strong></p><p className="info-line">Total HT : {money(snapshot.subtotalCents)} · TVA : {money(snapshot.taxCents)}</p>
-        <a className="button secondary" href={`/api/client/quotes/${id}/pdf`} target="_blank" rel="noopener noreferrer">Télécharger le devis PDF</a>
+        <a className="button secondary" href={`${api}/${id}/pdf`} target="_blank" rel="noopener noreferrer">Télécharger le devis PDF</a>
       </section>
       <section className="panel"><h2>Conditions de la prestation</h2><p style={{ whiteSpace: "pre-wrap" }}>{snapshot.terms}</p>{snapshot.seller.taxNote && <p>{snapshot.seller.taxNote}</p>}</section>
       {quote!.status === "SENT" && <section className="panel"><h2>Accepter votre devis</h2><form className="mutation-form" onSubmit={(event) => { event.preventDefault(); const data = new FormData(event.currentTarget); void perform("accept", { name: data.get("name"), agreement: data.get("agreement") === "on", documentHash: quote!.documentHash }); }}>

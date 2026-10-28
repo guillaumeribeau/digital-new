@@ -125,8 +125,8 @@ test("suivi de production, liens HTTPS, conflits et historique transactionnel", 
   await adminService.projectLinks(authenticated(), { id: project.id, expectedUpdatedAt: project.updatedAt.toISOString(), previewUrl: "https://preview.example.com", websiteUrl: "https://site.example.com" });
   await assert.rejects(adminService.projectLinks(authenticated(), { id: project.id, expectedUpdatedAt: project.updatedAt.toISOString(), previewUrl: "https://other.example.com", websiteUrl: "" }), BusinessError);
   await adminService.note(authenticated(), { id: project.id, kind: "project", content: "Projet fictif à suivre" });
-  const previousStripeKey = process.env.STRIPE_SECRET_KEY;
-  process.env.STRIPE_SECRET_KEY = "sk_test_admin_fixture";
+  const previousStripeKey = process.env.ZELYWEB_STRIPE_SECRET_KEY;
+  process.env.ZELYWEB_STRIPE_SECRET_KEY = "sk_test_admin_fixture";
   // Production-flow fixture: publication requires confirmed creation and first monthly payment.
   await db.siteOrder.create({ data: { workflowVersion: 0, projectId: project.id, previewUrl: "https://preview.example.com", screenshot: "fixture", message: "Fixture", mode: "TEST", tokenHash: randomUUID().replaceAll("-", "").padEnd(64, "0"), tokenEncrypted: "fixture", creationPaidAt: new Date(), firstSubscriptionPaidAt: new Date(), subscriptionStatus: "active" } });
   for (const stage of ["CONTENT_PREPARATION", "CREATION", "REVIEW", "PREVIEW_READY", "PREVIEW_SENT", "AWAITING_APPROVAL", "APPROVED", "AWAITING_PAYMENT", "PAID", "PUBLISHING", "PUBLISHED"]) {
@@ -138,7 +138,7 @@ test("suivi de production, liens HTTPS, conflits et historique transactionnel", 
   assert.equal((await db.lead.findUniqueOrThrow({ where: { id: project.leadId } })).status, "PUBLISHED");
   assert.equal((await adminService.dashboard(authenticated())).completed, 1);
   assert.equal(await db.activityLog.count({ where: { projectId: project.id, action: "PROJECT_STAGE_CHANGED" } }), 11);
-  process.env.STRIPE_SECRET_KEY = previousStripeKey || "";
+  process.env.ZELYWEB_STRIPE_SECRET_KEY = previousStripeKey || "";
 });
 test("corbeille : retrait des listes, arrêt de la validation et des envois, restauration avec historique", async () => {
   const before = await adminService.dashboard(authenticated());

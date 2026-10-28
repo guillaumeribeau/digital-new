@@ -25,3 +25,5 @@ L’identité visuelle, les contenus commerciaux, les tarifs et les routes sont 
 ## Démonstrations et indexation
 
 Courant, Studio Alba et Pollen sont fictifs. Leurs formulaires ne transmettent rien. Les photos proviennent des ressources Pexels documentées dans le dépôt. L’indexation globale reste désactivée par défaut ; commande, suivi et démonstrations restent noindex.
+
+Configuration des comptes marchands distincts : [Stripe Zelyweb et Tadapo](stripe-deux-marques.md).

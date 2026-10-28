@@ -1,5 +1,5 @@
+import { workspaceDb } from "../../../../../../../lib/brand-context";
 import { NextRequest } from "next/server";
-import { getDb } from "@nova/database";
 import { Resend } from "resend";
 import { z } from "zod";
 import { authenticate, AdminAccessError } from "../../../../../../../lib/access";
@@ -9,7 +9,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   try {
     await authenticate(request.headers);
     const { id, attachmentId } = await params; z.uuid().parse(id); z.string().regex(/^[A-Za-z0-9_-]{1,100}$/).parse(attachmentId);
-    const message = await getDb().clientMessage.findUnique({ where: { id } });
+    const message = await workspaceDb(request.headers).clientMessage.findUnique({ where: { id } });
     const files = z.array(z.object({ id: z.string(), filename: z.string() })).safeParse(message?.attachments);
     const file = files.success ? files.data.find((item) => item.id === attachmentId) : undefined;
     if (!file || !message?.providerId || message.direction !== "INBOUND" || !process.env.RESEND_API_KEY) return new Response(null, { status: 404 });

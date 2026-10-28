@@ -1,15 +1,16 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { tadapoAnniversary, tadapoOffer, tadapoOrderPath, tadapoSelection, type TadapoPlan, type TadapoTerm } from "../packages/shared/tadapo";
+import { tadapoAgreement, tadapoAnniversary, tadapoOffer, tadapoOrderPath, tadapoSelection, type TadapoPlan, type TadapoTerm } from "../packages/shared/tadapo";
+import { tadapoBillingWindow } from '../packages/shared/tadapo-workflow';
 import { tadapoBriefSchema } from "../packages/validation/tadapo";
 import { prepareTadapoOrder } from "../apps/tadapo/lib/order-contract";
 import { domainContribution, lookupDomain } from "../apps/tadapo/lib/domain";
 const brief = { plan: "essentiel", term: "12", company: "Atelier Exemple", activity: "Électricité", area: "Le Mans", fullName: "Camille Exemple", email: "camille@example.com", phone: "", objectives: "Recevoir des demandes de devis", services: "Rénovation électrique", audience: "Particuliers", pages: "", existingWebsite: "", style: "Lumineux", colors: "", inspirations: "", logo: "non", content: "", domainMode: "help", domain: "" };
-test("le plafond annuel Business ne s’applique qu’aux .fr et .com, sur un prix en euros approuvé", () => {
+test("le domaine des deux formules est inclus jusqu’à 20 € HT/an, sur un prix en euros approuvé", () => {
   assert.deepEqual(domainContribution("business", "atelier.fr", 2600), { actualHtCents: 2600, includedHtCents: 2000, extraHtCents: 600 });
   assert.equal(domainContribution("business", "atelier.com", 1500).extraHtCents, 0);
-  assert.equal(domainContribution("essentiel", "atelier.com", 1500).extraHtCents, 1500);
-  assert.equal(domainContribution("business", "atelier.net", 1500).extraHtCents, 1500);
+  assert.equal(domainContribution("essentiel", "atelier.com", 1500).extraHtCents, 0);
+  assert.equal(domainContribution("business", "atelier.net", 1500).extraHtCents, 0);
   for (const price of [-1, 1.5, NaN, Infinity]) assert.throws(() => domainContribution("business", "atelier.fr", price));
 });
 test("la recherche Vercel conserve les dollars et distingue extension non supportée et domaine pris", async () => {
@@ -36,7 +37,9 @@ test("les quatre formules conservent leurs prix TTC, durées et avantages", () =
     assert.equal(order.offerSnapshot.htCents, ht); assert.equal(order.offerSnapshot.ttcCents, ttc);
     assert.equal(order.offerSnapshot.minimumMonths, minimumMonths);
     assert.equal(order.brand, "tadapo"); assert.equal(order.status, "draft");
-    assert.equal(order.offerSnapshot.domainAnnualCapCents, plan === "business" ? 2000 : 0);
+    assert.equal(order.offerSnapshot.domainAnnualCapCents, 2000);
+    assert.equal(order.offerSnapshot.initialRevisionRounds,3);
+    assert.doesNotMatch(tadapoAgreement(order.offerSnapshot),/minute/i);
   }
 });
 test("le brief refuse les prix, statuts et identités privilégiées injectés par le client", () => {
@@ -65,4 +68,11 @@ test("Business exige une description des pages, contrairement à Essentiel", () 
 test("les anniversaires mensuels sont bornés aux jours réels du mois", () => {
   assert.equal(tadapoAnniversary(new Date("2026-01-31T12:34:56Z"), 1).toISOString(), "2026-02-28T12:34:56.000Z");
   assert.equal(tadapoAnniversary(new Date("2024-02-29T12:34:56Z"), 12).toISOString(), "2025-02-28T12:34:56.000Z");
+});
+test('la période des modifications change à l’heure anniversaire, y compris après un mois court',()=>{
+  const start=new Date('2026-01-31T12:00:00Z');
+  assert.equal(tadapoBillingWindow(start,new Date('2026-02-28T11:59:59Z')).start.toISOString(),start.toISOString());
+  const february=tadapoBillingWindow(start,new Date('2026-02-28T12:00:00Z'));
+  assert.equal(february.start.toISOString(),'2026-02-28T12:00:00.000Z');assert.equal(february.end.toISOString(),'2026-03-31T12:00:00.000Z');
+  assert.equal(tadapoBillingWindow(start,new Date('2026-03-31T12:00:00Z')).start.toISOString(),'2026-03-31T12:00:00.000Z');
 });

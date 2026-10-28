@@ -89,7 +89,7 @@ export async function applySiteBillingEvent(event: Stripe.Event) {
         if (invoice.status === "paid" && invoice.amount_paid === creationTtc(order.monthlyHtCents) && invoice.currency === "eur" && invoice.billing_reason === "subscription_create") await queueSiteNotice(order.id, "SUBSCRIPTION_ACTIVE", "Votre abonnement Zelyweb est activé", "Le premier paiement mensuel est confirmé et votre abonnement est activé. Votre site sera mis en ligne sur le domaine définitif sous 2 jours ouvrés, si le domaine et ses accès sont prêts. Vos factures et la gestion de votre abonnement sont disponibles depuis votre portail client.");
       }
     } else if (z.uuid().safeParse(invoice.metadata?.quoteId).success) {
-      const quote = await getDb().quote.findUniqueOrThrow({ where: { id: invoice.metadata!.quoteId } });
+      const quote = await getDb().quote.findUniqueOrThrow({ where: { id: invoice.metadata!.quoteId, lead: { brand: "zelyweb" } } });
       if (invoice.currency !== quote.currency || invoice.total !== quote.totalCents) throw new CommercialError("INVALID_ACTION");
       await getDb().$transaction(tx => storeBillingInvoice(tx, invoice, undefined, quote.id));
     }

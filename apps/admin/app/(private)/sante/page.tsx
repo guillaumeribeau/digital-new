@@ -1,9 +1,11 @@
-import { getDb } from "@nova/database";
+import { headers } from "next/headers";
+import { workspaceDb } from "../../../lib/brand-context";
 import { requireAdmin } from "../../../lib/access";
 import { PageTitle, date } from "../../../components/ui";
+import { zelywebStripeKey, zelywebStripeWebhookSecret } from "../../../lib/commercial-core";
 export default async function Health() {
-  await requireAdmin(); const db = getDb(); await db.$queryRaw`SELECT 1`;
+  await requireAdmin(); const db = workspaceDb(await headers()); await db.$queryRaw`SELECT 1`;
   const [heartbeat, pending, dead] = await Promise.all([db.serviceHeartbeat.findUnique({ where: { id: "mail-worker" } }), db.commercialEmail.count({ where: { status: { in: ["PENDING", "PROCESSING"] } } }), db.commercialEmail.count({ where: { status: "DEAD" } })]);
-  const configs = [["Stripe", !!process.env.STRIPE_SECRET_KEY, !!process.env.STRIPE_WEBHOOK_SECRET], ["E-mails", !!process.env.RESEND_API_KEY, !!process.env.RESEND_WEBHOOK_SECRET], ["Chiffrement commercial", !!process.env.COMMERCIAL_ENCRYPTION_KEY, true]] as const;
+  const configs = [["Stripe Zelyweb — ZELYWEB_STRIPE_SECRET_KEY / ZELYWEB_STRIPE_WEBHOOK_SECRET", !!zelywebStripeKey(), !!zelywebStripeWebhookSecret()], ["Stripe Tadapo — TADAPO_STRIPE_SECRET_KEY / TADAPO_STRIPE_WEBHOOK_SECRET", !!process.env.TADAPO_STRIPE_SECRET_KEY, !!process.env.TADAPO_STRIPE_WEBHOOK_SECRET], ["E-mails", !!process.env.RESEND_API_KEY, !!process.env.RESEND_WEBHOOK_SECRET], ["Chiffrement commercial", !!process.env.COMMERCIAL_ENCRYPTION_KEY, true]] as const;
   return <><PageTitle eyebrow="EXPLOITATION" title="État des services" description="Aucun secret n’est affiché. Les variables présentes ne prouvent pas que le fournisseur est joignable." /><section className="panel"><h2>Base de données</h2><p>Connexion et lecture : OK</p><h2>Worker e-mail</h2><p className={heartbeat && new Date().getTime() - heartbeat.lastSeenAt.getTime() < 120000 && !heartbeat.lastError ? "notice" : "notice error"}>{!heartbeat ? "Aucun signal reçu" : new Date().getTime() - heartbeat.lastSeenAt.getTime() >= 120000 ? "Signal absent depuis plus de 2 minutes" : heartbeat.lastError ? `Dernière erreur : ${heartbeat.lastError}` : "En activité"}</p>{heartbeat && <p>Dernier signal : {date(heartbeat.lastSeenAt)} · {heartbeat.lastSeenAt.toLocaleTimeString("fr-FR")} · Dernier cycle réussi : {heartbeat.lastSuccessAt?.toISOString() || "Aucun"}</p>}<p>{pending} e-mail(s) en attente · {dead} échec(s) définitif(s). Vérifier l’historique avant un renvoi manuel.</p><h2>Configuration de l’admin</h2>{configs.map(([name, key, webhook]) => <p key={name}>{name} : {key ? "clé présente" : "clé absente"}{webhook ? "" : " · webhook non configuré"}</p>)}<p className="info-line">Le worker utilise ses propres variables Railway. Le signal ci-dessus reflète son dernier traitement ; les statuts d’envoi et de livraison sont consultables dans E-mails.</p></section></>;
 }

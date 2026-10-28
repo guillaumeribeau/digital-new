@@ -1,9 +1,9 @@
+import { workspaceDb } from "../../../../lib/brand-context";
 import { TadapoOrderCard } from "../../../../components/tadapo-order-card";
 import { ProjectWorkflow } from "../../../../components/project-workflow";
 import { DomainWorkflow } from "../../../../components/domain-workflow";
 import { workflowData } from "../../../../lib/project-workflow";
 import Link from "next/link";
-import { getDb } from "@nova/database";
 import { SiteBillingCard } from "../../../../components/site-billing-card";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
@@ -19,7 +19,7 @@ export default async function ProjectDetail({ params }: { params: Promise<{ id: 
   if (!z.uuid().safeParse(id).success) notFound();
   const project = await adminService.project(await headers(), id);
   if (!project) notFound();
-  const billing = await getDb().siteOrder.findUnique({ where: { projectId: id }, include: { invoices: { orderBy: { createdAt: "desc" }, take: 50 } } });
+  const billing = await workspaceDb(await headers()).siteOrder.findUnique({ where: { projectId: id }, include: { invoices: { orderBy: { createdAt: "desc" }, take: 50 } } });
   const billingView = billing ? { id: billing.id, refundedCents: billing.refundedCents, disputeStatus: billing.disputeStatus, version: billing.version, status: billing.status, mode: billing.mode, previewUrl: billing.previewUrl, screenshot: billing.screenshot, message: billing.message, creationHtCents: billing.creationHtCents, paid: !!billing.creationPaidAt, revisionEmailSent: !!billing.revisionEmailSentAt, revisionEmailMessage: billing.revisionEmailMessage, subscriptionInvited: !!billing.subscriptionInviteSentAt, subscriptionStatus: billing.subscriptionStatus, subscriptionId: !!billing.stripeSubscriptionId, firstPaid: !!billing.firstSubscriptionPaidAt, alert: billing.billingAlert, cancelAtPeriodEnd: billing.cancelAtPeriodEnd, invoiceUrl: billing.lastInvoiceUrl, invoices: billing.invoices.map(i => ({ id: i.id, status: i.status, amountCents: i.amountCents, hostedUrl: i.hostedUrl, pdfUrl: i.pdfUrl })) } : null;
   const isTadapo = project.lead.brand === "tadapo";
   const workflow = billing?.creationPaidAt ? JSON.parse(JSON.stringify(await workflowData(billing.id, true))) : null;

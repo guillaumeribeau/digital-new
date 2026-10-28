@@ -73,7 +73,7 @@ Créer un webhook vers `https://VOTRE-ORIGINE-ADMIN/api/webhooks/resend`, pour `
 
 ## Configuration Stripe
 
-Ajouter `STRIPE_SECRET_KEY` et `STRIPE_WEBHOOK_SECRET` au service administrateur. Commencer avec une clé `sk_test_`. Aucune clé Stripe n’est exposée au navigateur : le client est redirigé vers Stripe Checkout hébergé après acceptation.
+Ajouter `ZELYWEB_STRIPE_SECRET_KEY` et `ZELYWEB_STRIPE_WEBHOOK_SECRET` au service administrateur. Commencer avec une clé `sk_test_`. Aucune clé Stripe n’est exposée au navigateur : le client est redirigé vers Stripe Checkout hébergé après acceptation.
 
 Créer un webhook vers `https://VOTRE-ORIGINE-ADMIN/api/webhooks/stripe` pour :
 
@@ -169,8 +169,8 @@ Le portail Stripe propose les factures, la mise à jour de carte et la résiliat
 
 ### Variables et webhook (service admin)
 
-- `STRIPE_SECRET_KEY` : clé serveur de test `sk_test_…`, puis clé réelle `sk_live_…` après activation et recette. Ne jamais mettre cette clé dans Git ou dans une variable `NEXT_PUBLIC_`.
-- `STRIPE_WEBHOOK_SECRET` : secret `whsec_…` propre au point de terminaison et au mode Stripe.
+- `ZELYWEB_STRIPE_SECRET_KEY` : clé serveur de test `sk_test_…`, puis clé réelle `sk_live_…` après activation et recette. Ne jamais mettre cette clé dans Git ou dans une variable `NEXT_PUBLIC_`.
+- `ZELYWEB_STRIPE_WEBHOOK_SECRET` : secret `whsec_…` propre au point de terminaison et au mode Stripe.
 - `COMMERCIAL_PUBLIC_URL` : origine publique du service admin, utilisée pour les liens clients et les retours de paiement.
 - `COMMERCIAL_FROM_EMAIL`, `COMMERCIAL_ENCRYPTION_KEY`, `RESEND_API_KEY` : à conserver dans l’admin et le worker pour les e-mails commerciaux. Le worker traite la même base et lance `npm run outbox:watch`.
 

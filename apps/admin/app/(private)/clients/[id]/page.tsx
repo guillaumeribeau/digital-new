@@ -1,7 +1,7 @@
 import { requireAdmin } from "../../../../lib/access";
 import Link from "next/link";
 import { headers } from "next/headers";
-import { redirect, notFound } from "next/navigation";
+import { notFound } from "next/navigation";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { commercialService } from "../../../../lib/commercial";
@@ -14,13 +14,12 @@ export default async function ClientDetail({ params }: { params: Promise<{ id: s
   await requireAdmin();
   const { id } = await params; if (!z.uuid().safeParse(id).success) notFound();
   const h = await headers(), client = await commercialService.client(h, id); if (!client) notFound();
-  if (client.brand === "tadapo" && client.project) redirect(`/projets/${client.project.id}`);
   const templates = await commercialService.templates(h);
   return <><Link className="back-link" href="/clients">← Tous les clients</Link><PageTitle eyebrow="RELATION CLIENT" title={client.businessName} description={`${client.fullName} · ${client.email}`} action={<Link className="button" href={`/devis/nouveau?client=${id}`}>Nouveau devis complémentaire</Link>} />
     <nav className="commercial-tabs" aria-label="Fiche client"><a href="#echanges">Échanges</a><a href="#devis">Devis</a><a href="#paiements">Paiements</a><Link href={`/emails?client=${id}`}>Historique des e-mails</Link><Link href={`/demandes/${id}`}>Demande initiale</Link>{client.project && <Link href={`/projets/${client.project.id}`}>Projet</Link>}</nav>
-    {!client.emailVerifiedAt && <p className="notice section-gap">Le client doit confirmer son adresse e-mail avant l’envoi de messages ou de devis.</p>}
+    {!(client.emailVerifiedAt || client.brand === "tadapo" && client.project) && <p className="notice section-gap">Le client doit confirmer son adresse e-mail avant l’envoi de messages ou de devis.</p>}
     <div className="detail-grid section-gap"><section className="panel" id="echanges"><h2>Échanges avec le client</h2>{client.conversation?.needsReply && <p className="notice section-gap">Ce client attend votre réponse.</p>}
-      {client.emailVerifiedAt && <MessageComposer leadId={id} requestId={randomUUID()} templates={templates.messages} />}
+      {(client.emailVerifiedAt || client.brand === "tadapo" && client.project) && <MessageComposer leadId={id} requestId={randomUUID()} templates={templates.messages} />}
       <div className="section-gap">{client.conversation?.messages.length ? client.conversation.messages.map((message) => {
         const files = z.array(z.object({ id: z.string(), filename: z.string() })).safeParse(message.attachments);
         return <article className={"client-message " + message.direction.toLowerCase()} key={message.id}><div className="note-meta">{message.direction === "INBOUND" ? "Client" : "Votre équipe"} · {date(message.createdAt)} · {deliveryStatuses[message.deliveryStatus] || message.deliveryStatus}</div><h3>{message.subject}</h3><p>{message.content}</p>{files.success && files.data.map((file) => <p key={file.id}><a className="text-link" href={`/api/admin/messages/${message.id}/attachments/${encodeURIComponent(file.id)}`}>Télécharger : {file.filename}</a></p>)}</article>;

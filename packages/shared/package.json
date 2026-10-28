@@ -13,7 +13,10 @@
     "./business": "./business.ts",
     "./tadapo": "./tadapo.ts",
     "./tadapo-server": "./tadapo-server.ts",
+    "./tadapo-mail": "./tadapo-mail.ts",
+    "./tadapo-workflow": "./tadapo-workflow.ts",
     "./tadapo-domain": "./tadapo-domain.ts",
-    "./secure-payload": "./secure-payload.ts"
+    "./secure-payload": "./secure-payload.ts",
+    "./brands": "./brands.ts"
   }
 }

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { getDb, type TadapoOrder } from "@nova/database";
 import { authorizeTadapo, queueTadapoEmail, tadapoMode, tadapoStripe, tadapoClientLink, TadapoError } from "./tadapo-server";
+import { queueTadapoOwner } from "./tadapo-mail";
 import type { TadapoOffer } from "./tadapo";
 export const domainQuoteInput = z.object({
   domain: z.string().trim().toLowerCase().max(253).regex(/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/),
@@ -8,18 +9,24 @@ export const domainQuoteInput = z.object({
 });
 export function prepareDomainQuote(input: unknown, offer: TadapoOffer) {
   const d = domainQuoteInput.parse(input);
-  const cap = d.kind === "new" && /\.(fr|com)$/.test(d.domain) ? offer.domainAnnualCapCents : 0;
+  const cap = d.kind === "new" ? Math.max(2000, offer.domainAnnualCapCents) : 0;
   if (d.kind === "existing" && (d.initialHtCents || d.renewalHtCents)) throw new TadapoError("INVALID_DOMAIN_QUOTE");
   return { ...d, includedHtCents: cap, initialExtraHtCents: Math.max(0, d.initialHtCents - cap), renewalExtraHtCents: Math.max(0, d.renewalHtCents - cap), checkedAt: new Date().toISOString(),
     agreement: "Je confirme ce domaine, à mon nom, et les tarifs annuels d’achat et de renouvellement présentés en euros HT (TVA 20 %). L’achat reste soumis à disponibilité et à un contrôle manuel. Tout changement de tarif nécessite un nouvel accord. Aucun renouvellement supplémentaire n’est prélevé automatiquement." };
 }
 export type TadapoDomainQuote = ReturnType<typeof prepareDomainQuote>;
 export async function acceptTadapoDomain(id: string, token: string | null, version: number) {
-  const o = await authorizeTadapo(id, token);
-  if (!o.paidAt || !o.domainQuote || version !== o.domainVersion) throw new TadapoError("INVALID_ACTION");
-  const count = await getDb().tadapoOrder.updateMany({ where: { id, domainVersion: version, domainAcceptedAt: null }, data: { domainAcceptedAt: new Date() } });
-  if (!count.count && !await getDb().tadapoOrder.findFirst({ where: { id, domainVersion: version, domainAcceptedAt: { not: null } } })) throw new TadapoError("INVALID_ACTION");
-  return count.count;
+  await authorizeTadapo(id, token);
+  return getDb().$transaction(async tx=>{
+    await tx.$queryRaw`SELECT "id" FROM "TadapoOrder" WHERE "id"=${id}::uuid FOR UPDATE`;
+    const o=await tx.tadapoOrder.findUniqueOrThrow({where:{id}});
+    if (!o.paidAt || !o.domainQuote || version !== o.domainVersion) throw new TadapoError("INVALID_ACTION");
+    if(o.domainAcceptedAt)return 0;
+    await tx.tadapoOrder.update({where:{id},data:{domainAcceptedAt:new Date()}});
+    const q=o.domainQuote as TadapoDomainQuote;
+    await queueTadapoOwner(tx,o,'domain-accepted/'+version,'Domaine et tarifs Tadapo approuvés',`${q.domain}\nSupplément initial approuvé : ${(q.initialExtraHtCents/100).toFixed(2)} € HT. Vérifiez son règlement avant l’achat manuel.`);
+    return 1;
+  });
 }
 export async function payTadapoDomain(id: string, token: string | null, version: number) {
   await authorizeTadapo(id, token);
@@ -54,6 +61,7 @@ export async function confirmTadapoDomainPayment(o: TadapoOrder, sessionId: stri
   await getDb().$transaction(async tx => {
     const updated = await tx.tadapoOrder.updateMany({ where: { id: o.id, domainVersion: o.domainVersion, domainSessionId: s.id, domainPaidAt: null }, data: { domainPaidAt: new Date() } });
     if (updated.count) await queueTadapoEmail(tx, o, "TADAPO_DOMAIN_PAYMENT", "Votre paiement de domaine Tadapo est confirmé", `Le supplément initial de votre domaine ${quote.domain} a été réglé. L’achat reste effectué manuellement à votre nom après vérification. Ce paiement ne déclenche aucun supplément automatique au renouvellement.`);
+    if(updated.count)await queueTadapoOwner(tx,o,'domain-paid/'+o.domainVersion,'Supplément du domaine Tadapo payé',`${quote.domain} : ${(quote.initialExtraHtCents/100).toFixed(2)} € HT réglés. L’achat manuel peut être préparé après vérification de disponibilité.`);
   });
   const invoiceId = typeof s.invoice === "string" ? s.invoice : s.invoice?.id;
   if (invoiceId) {

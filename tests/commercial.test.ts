@@ -34,13 +34,13 @@ test("aucun accès anonyme aux clients, messages, devis, paramètres ou PDF clie
   assert.equal((await resendWebhook(new Request("http://localhost/api/webhooks/resend", { method: "POST", body: "{}" }))).status, 400);
 });
 test("la simulation commerciale est impossible en production et hors loopback", () => {
-  const keys = ["NODE_ENV", "COMMERCIAL_MODE", "COMMERCIAL_PUBLIC_URL", "STRIPE_SECRET_KEY"];
+  const keys = ["NODE_ENV", "COMMERCIAL_MODE", "COMMERCIAL_PUBLIC_URL", "ZELYWEB_STRIPE_SECRET_KEY"];
   const previous = Object.fromEntries(keys.map((key) => [key, process.env[key]]));
   try {
-    Object.assign(process.env, { NODE_ENV: "development", COMMERCIAL_MODE: "local", COMMERCIAL_PUBLIC_URL: "http://localhost:3001", STRIPE_SECRET_KEY: "" });
+    Object.assign(process.env, { NODE_ENV: "development", COMMERCIAL_MODE: "local", COMMERCIAL_PUBLIC_URL: "http://localhost:3001", ZELYWEB_STRIPE_SECRET_KEY: "" });
     assert.equal(commercialLocal(), true); assert.equal(paymentMode(), "LOCAL");
-    Object.assign(process.env, { STRIPE_SECRET_KEY: "sk_live_fake_for_test" }); assert.equal(paymentMode(), "UNCONFIGURED");
-    Object.assign(process.env, { STRIPE_SECRET_KEY: "" });
+    Object.assign(process.env, { ZELYWEB_STRIPE_SECRET_KEY: "sk_live_fake_for_test" }); assert.equal(paymentMode(), "UNCONFIGURED");
+    Object.assign(process.env, { ZELYWEB_STRIPE_SECRET_KEY: "" });
     Object.assign(process.env, { NODE_ENV: "production" }); assert.equal(commercialLocal(), false); assert.equal(paymentMode(), "UNCONFIGURED");
     Object.assign(process.env, { NODE_ENV: "development", COMMERCIAL_PUBLIC_URL: "https://admin.example.com" }); assert.equal(commercialLocal(), false);
   } finally { for (const [key, value] of Object.entries(previous)) { if (value === undefined) delete process.env[key]; else process.env[key] = value; } }

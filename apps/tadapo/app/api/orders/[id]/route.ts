@@ -14,7 +14,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   try {
     const body = await readOrderBody(request);
     await orderRateLimit(request, "client-action", 60);
-    const data = z.object({ action: z.enum(["approve", "feedback", "cancel", "payment-method", "domain-accept", "domain-pay"]) }).passthrough().parse(body);
+    const data = z.object({ action: z.enum(["approve", "feedback", "cancel", "payment-method", "domain-accept", "domain-pay", "domain-request", "domain-renewal", "extra-request", "monthly"]) }).passthrough().parse(body);
     const { id } = await params, secret = token(request);
     if (data.action === "cancel") await cancelTadapo(id, secret);
     else if (data.action === "payment-method") return Response.json({ url: await tadapoPaymentMethodLink(id, secret) }, { headers: privateHeaders });

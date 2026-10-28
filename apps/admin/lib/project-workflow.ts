@@ -1,3 +1,4 @@
+import { workspaceDb } from "./brand-context";
 import { getDb, type Prisma, type SiteOrder } from "@nova/database";
 import { domainToASCII } from "node:url";
 import { z } from "zod";
@@ -36,7 +37,7 @@ export async function workflowData(id: string, admin = false) {
 export async function adminWorkflow(h: Headers, id: string, input: unknown) {
   const actor = await authenticate(h);
   const d = z.object({ action: z.enum(["options", "close", "version", "deliver", "email", "review-resend", "domain-invite", "domain-reserved", "domain-email", "domain-renewal", "domain-ready", "retry-subscription"]), requestId: z.uuid().optional(), expectedVersion: z.number().int().optional(), renewalHtCents: cents.optional(), options: z.array(z.object({ domain: z.string(), initialHtCents: cents, renewalHtCents: cents, recommended: z.boolean() })).max(5).optional(), roundId: z.uuid().optional(), message: z.string().trim().min(2).max(10000).optional(), url: z.url().max(1000).optional(), quoteId: z.uuid().optional(), renewalAt: z.iso.date().optional() }).parse(input);
-  return getDb().$transaction(async tx => {
+  return workspaceDb(h).$transaction(async tx => {
     const o = await txOrder(tx, id);
     const previousMail = d.requestId && await tx.commercialEmail.findUnique({ where: { manualRequestId: d.requestId } });
     if (previousMail) { if (previousMail.siteOrderId !== id) throw new CommercialError("INVALID_ACTION"); return; }

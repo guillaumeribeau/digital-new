@@ -1,12 +1,13 @@
+import { type Brand, brandOf } from "@nova/shared/brands";
 import { getDb } from "@nova/database";
 import Stripe from "stripe";
 import { z } from "zod";
 import { queueQuoteOwnerNotification } from "./owner-notifications";
-import { commercialLocal, CommercialError, paymentMode, publicOrigin, snapshotSchema } from "./commercial-core";
+import { commercialLocal, CommercialError, paymentMode, publicOrigin, snapshotSchema, zelywebStripeKey } from "./commercial-core";
 
-export function stripeClient() {
-  if (!["TEST", "LIVE"].includes(paymentMode())) throw new CommercialError("CONFIGURATION_REQUIRED");
-  return new Stripe(process.env.STRIPE_SECRET_KEY!, { timeout: 10000, maxNetworkRetries: 1, httpClient: Stripe.createFetchHttpClient() });
+export function stripeClient(brand: Brand = "zelyweb") {
+  if (!["TEST", "LIVE"].includes(paymentMode(brand))) throw new CommercialError("CONFIGURATION_REQUIRED");
+  return new Stripe((brand === "tadapo" ? process.env.TADAPO_STRIPE_SECRET_KEY : zelywebStripeKey())!, { timeout: 10000, maxNetworkRetries: 1, httpClient: Stripe.createFetchHttpClient() });
 }
 export async function acceptQuote(id: string, input: unknown) {
   const data = z.object({ name: z.string().trim().min(2).max(200), agreement: z.literal(true), documentHash: z.string().regex(/^[a-f0-9]{64}$/) }).parse(input);
@@ -35,7 +36,9 @@ export async function declineQuote(id: string, input: unknown) {
   });
 }
 export async function checkoutQuote(id: string) {
-  const mode = paymentMode(); if (!["TEST", "LIVE"].includes(mode)) throw new CommercialError("CONFIGURATION_REQUIRED");
+  const owner = await getDb().quote.findUniqueOrThrow({ where: { id }, include: { lead: true } });
+  const brand = brandOf(owner.lead.brand);
+  const mode = paymentMode(brand); if (!["TEST", "LIVE"].includes(mode)) throw new CommercialError("CONFIGURATION_REQUIRED");
   const result = await getDb().$transaction(async (tx) => {
     await tx.$queryRaw`SELECT "id" FROM "Quote" WHERE "id" = ${id}::uuid FOR UPDATE`;
     const quote = await tx.quote.findUniqueOrThrow({ where: { id } });
@@ -47,20 +50,20 @@ export async function checkoutQuote(id: string) {
   });
   if (result.url) return result.url;
   const snapshot = snapshotSchema.parse(result.quote.snapshot);
-  const siteOrder = await getDb().siteOrder.findFirst({ where: { project: { leadId: result.quote.leadId }, mode }, select: { stripeCustomerId: true } });
-  const stripe = stripeClient();
+  const siteOrder = brand === "tadapo" ? await getDb().tadapoOrder.findFirst({ where: { project: { leadId: result.quote.leadId }, mode }, select: { stripeCustomerId: true } }) : await getDb().siteOrder.findFirst({ where: { project: { leadId: result.quote.leadId }, mode }, select: { stripeCustomerId: true } });
+  const stripe = stripeClient(brand);
   const rates = new Map<number, string>();
   for (const item of snapshot.items) if (item.taxBasisPoints && !rates.has(item.taxBasisPoints)) {
     const rate = await stripe.taxRates.create({ display_name: "TVA", percentage: item.taxBasisPoints / 100, inclusive: false, country: "FR" }, { idempotencyKey: `quote-tax/${result.attempt.id}/${item.taxBasisPoints}` });
     rates.set(item.taxBasisPoints, rate.id);
   }
-  const session = await stripeClient().checkout.sessions.create({
+  const session = await stripeClient(brand).checkout.sessions.create({
     mode: "payment", ...(siteOrder?.stripeCustomerId ? { customer: siteOrder.stripeCustomerId } : { customer_email: snapshot.buyer.email, customer_creation: "always" as const }), client_reference_id: result.quote.id,
-    billing_address_collection: "required", invoice_creation: { enabled: true, invoice_data: { metadata: { quoteId: id } } },
+    billing_address_collection: "required", invoice_creation: { enabled: true, invoice_data: { metadata: { brand, quoteId: id } } },
     line_items: snapshot.items.map(item => ({ price_data: { currency: "eur", unit_amount: item.unitCents, product_data: { name: item.label } }, quantity: item.quantity, tax_rates: item.taxBasisPoints ? [rates.get(item.taxBasisPoints)!] : [] })),
-    metadata: { quoteId: id, attemptId: result.attempt.id, documentHash: result.quote.documentHash! },
-    payment_intent_data: { metadata: { quoteId: id, attemptId: result.attempt.id } },
-    success_url: `${publicOrigin()}/client/devis/${id}?retour=paiement`, cancel_url: `${publicOrigin()}/client/devis/${id}`,
+    metadata: { brand, quoteId: id, attemptId: result.attempt.id, documentHash: result.quote.documentHash! },
+    payment_intent_data: { metadata: { brand, quoteId: id, attemptId: result.attempt.id } },
+    success_url: `${publicOrigin(brand)}/client/devis/${id}?retour=paiement`, cancel_url: `${publicOrigin(brand)}/client/devis/${id}`,
     expires_at: Math.floor(result.attempt.expiresAt!.getTime() / 1000),
   }, { idempotencyKey: "nova-quote/" + result.attempt.id });
   if (!session.url || !session.url.startsWith("https://checkout.stripe.com/")) throw new CommercialError("CONFIGURATION_REQUIRED");
@@ -68,7 +71,8 @@ export async function checkoutQuote(id: string) {
   return session.url;
 }
 export async function simulateQuotePayment(id: string) {
-  if (!commercialLocal() || paymentMode() !== "LOCAL") throw new CommercialError("INVALID_ACTION");
+  const owner = await getDb().quote.findUniqueOrThrow({ where: { id }, include: { lead: true } });
+  if (!commercialLocal() || paymentMode(brandOf(owner.lead.brand)) !== "LOCAL") throw new CommercialError("INVALID_ACTION");
   await getDb().$transaction(async (tx) => {
     await tx.$queryRaw`SELECT "id" FROM "Quote" WHERE "id" = ${id}::uuid FOR UPDATE`;
     const quote = await tx.quote.findUniqueOrThrow({ where: { id } });
@@ -79,21 +83,22 @@ export async function simulateQuotePayment(id: string) {
     await queueQuoteOwnerNotification(tx, quote, "PAID", "Devis complémentaire : paiement simulé", "Le paiement est simulé dans l’environnement local. Aucun débit réel.", "LOCAL");
   });
 }
-export async function applyStripeEvent(event: Stripe.Event) {
+export async function applyStripeEvent(event: Stripe.Event, brand: Brand = "zelyweb") {
   const relevant = ["checkout.session.completed", "checkout.session.async_payment_succeeded", "checkout.session.async_payment_failed", "checkout.session.expired"];
   if (!relevant.includes(event.type)) return;
   const session = event.data.object as Stripe.Checkout.Session;
   if (!z.uuid().safeParse(session.metadata?.attemptId).success) return;
   await getDb().$transaction(async (tx) => {
-    const key = "stripe/" + event.id;
+    const key = "stripe/" + brand + "/" + event.id;
     if (await tx.commercialWebhook.findUnique({ where: { key } })) return;
     const attempt = await tx.paymentAttempt.findUnique({ where: { id: session.metadata!.attemptId } });
     if (!attempt) return;
     await tx.$queryRaw`SELECT "id" FROM "Quote" WHERE "id" = ${attempt.quoteId}::uuid FOR UPDATE`;
     if (await tx.commercialWebhook.findUnique({ where: { key } })) return;
-    const quote = await tx.quote.findUniqueOrThrow({ where: { id: attempt.quoteId } });
+    const quote = await tx.quote.findUniqueOrThrow({ where: { id: attempt.quoteId }, include: { lead: true } });
+    if (quote.lead.brand !== brand) throw new CommercialError("INVALID_ACTION");
     const mode = event.livemode ? "LIVE" : "TEST";
-    if (attempt.mode !== mode || paymentMode() !== mode || session.metadata?.quoteId !== quote.id || session.metadata?.documentHash !== quote.documentHash || session.currency !== attempt.currency || session.amount_total !== attempt.amountCents || (attempt.stripeSessionId && attempt.stripeSessionId !== session.id)) throw new CommercialError("INVALID_ACTION");
+    if (attempt.mode !== mode || paymentMode(brand) !== mode || session.metadata?.quoteId !== quote.id || session.metadata?.documentHash !== quote.documentHash || session.currency !== attempt.currency || session.amount_total !== attempt.amountCents || (attempt.stripeSessionId && attempt.stripeSessionId !== session.id)) throw new CommercialError("INVALID_ACTION");
     if (["checkout.session.completed", "checkout.session.async_payment_succeeded"].includes(event.type) && session.payment_status === "paid") {
       if (!["ACCEPTED", "PAID", "COMPLETED"].includes(quote.status)) throw new CommercialError("INVALID_ACTION");
       await tx.paymentAttempt.update({ where: { id: attempt.id }, data: { status: "SUCCEEDED", stripeSessionId: session.id, paidAt: new Date() } });
@@ -105,4 +110,14 @@ export async function applyStripeEvent(event: Stripe.Event) {
     }
     await tx.commercialWebhook.create({ data: { key, provider: "STRIPE" } });
   });
+}
+
+export async function applyQuoteInvoice(event: Stripe.Event, brand: Brand) {
+  if (!["invoice.finalized", "invoice.paid", "invoice.payment_failed", "invoice.payment_action_required"].includes(event.type)) return;
+  const invoice = event.data.object as Stripe.Invoice;
+  if (!z.uuid().safeParse(invoice.metadata?.quoteId).success) return;
+  const quote = await getDb().quote.findUniqueOrThrow({ where: { id: invoice.metadata!.quoteId, lead: { brand } } });
+  if (paymentMode(brand) !== (event.livemode ? "LIVE" : "TEST") || invoice.currency !== quote.currency || invoice.total !== quote.totalCents) throw new CommercialError("INVALID_ACTION");
+  const { storeBillingInvoice } = await import("./site-billing");
+  await getDb().$transaction(tx => storeBillingInvoice(tx, invoice, undefined, quote.id));
 }

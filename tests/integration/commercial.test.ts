@@ -1,4 +1,9 @@
 import { after, test } from "node:test";
+import { workspaceDb } from "../../apps/admin/lib/brand-context";
+import { brandSellerDefaults } from "@nova/shared/brands";
+import { GET as tadapoQuoteGet, POST as tadapoQuotePost } from "../../apps/admin/app/api/client/tadapo/quotes/[id]/route";
+import { POST as tadapoAccess } from "../../apps/admin/app/api/client/tadapo/quotes/access/route";
+import { POST as tadapoStripeWebhook } from "../../apps/admin/app/api/webhooks/stripe/tadapo/route";
 import assert from "node:assert/strict";
 import { createHmac, randomBytes, randomUUID } from "node:crypto";
 import { NextRequest } from "next/server";
@@ -32,7 +37,7 @@ assert.equal(new URL(process.env.DATABASE_URL!).pathname, "/lead_pipeline_test")
 assert.equal(new URL(process.env.DATABASE_URL!).hostname, "127.0.0.1");
 assert.equal(process.env.NODE_ENV, "test");
 const db = getDb(), originalFetch = globalThis.fetch;
-const originalEnv = { COMMERCIAL_MODE: process.env.COMMERCIAL_MODE, STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET, RESEND_WEBHOOK_SECRET: process.env.RESEND_WEBHOOK_SECRET };
+const originalEnv = { COMMERCIAL_MODE: process.env.COMMERCIAL_MODE, ZELYWEB_STRIPE_SECRET_KEY: process.env.ZELYWEB_STRIPE_SECRET_KEY, ZELYWEB_STRIPE_WEBHOOK_SECRET: process.env.ZELYWEB_STRIPE_WEBHOOK_SECRET, RESEND_WEBHOOK_SECRET: process.env.RESEND_WEBHOOK_SECRET };
 let cookie = "", leadId = "", projectId = "", quoteId = "", revisedId = "", privateToken = "";
 const h = () => new Headers({ cookie });
 const seller = { legalName: "Entreprise Fictive de Contrôle", address: "1 rue Fictive, Ville Test", registrationNumber: "TEST-000", vatNumber: "", taxNote: "Mention de contrôle", terms: "Conditions fictives de contrôle. Paiement intégral après acceptation.", validityDays: 30, reminderDays: 0 };
@@ -119,7 +124,7 @@ test("révision : ancien lien révoqué, acceptation explicite et paiement local
 test("Stripe : montant serveur, session réutilisée, signature, mode et paiement asynchrone confirmés", async () => {
   const id = await commercialService.createQuote(h(), draft()); await commercialService.sendQuote(h(), id); const token = await quoteToken(id), quote = await db.quote.findUniqueOrThrow({ where: { id } });
   assert.equal((await clientPost(req(id, { action: "accept", name: "Camille Contrôle", agreement: true, documentHash: quote.documentHash }, token), context(id))).status, 200);
-  Object.assign(process.env, { STRIPE_SECRET_KEY: "sk_test_fake_fixture_only", STRIPE_WEBHOOK_SECRET: "whsec_fixture_only" });
+  Object.assign(process.env, { ZELYWEB_STRIPE_SECRET_KEY: "sk_test_fake_fixture_only", ZELYWEB_STRIPE_WEBHOOK_SECRET: "whsec_fixture_only" });
   let calls = 0, metadata: Record<string, string> = {}, sessionId = "";
   globalThis.fetch = async (url, init) => {
     if (String(url).endsWith("/tax_rates")) return Response.json({ id: "txr_fixture" });
@@ -132,7 +137,7 @@ test("Stripe : montant serveur, session réutilisée, signature, mode et paiemen
   const session = { id: sessionId, object: "checkout.session", currency: "eur", amount_total: 14400, payment_status: "unpaid", metadata };
   async function event(type: string, object: unknown, eventId = "evt_" + randomUUID()) {
     const body = JSON.stringify({ id: eventId, object: "event", type, livemode: false, data: { object } });
-    return stripeWebhook(new Request("http://localhost:3001/api/webhooks/stripe", { method: "POST", headers: { "stripe-signature": stripeClient().webhooks.generateTestHeaderString({ payload: body, secret: process.env.STRIPE_WEBHOOK_SECRET! }) }, body }));
+    return stripeWebhook(new Request("http://localhost:3001/api/webhooks/stripe", { method: "POST", headers: { "stripe-signature": stripeClient().webhooks.generateTestHeaderString({ payload: body, secret: process.env.ZELYWEB_STRIPE_WEBHOOK_SECRET! }) }, body }));
   }
   assert.equal((await stripeWebhook(new Request("http://localhost/api/webhooks/stripe", { method: "POST", headers: { "stripe-signature": "fake" }, body: "{}" }))).status, 400);
   assert.equal((await event("checkout.session.completed", session)).status, 200); assert.equal((await db.quote.findUniqueOrThrow({ where: { id } })).status, "ACCEPTED");
@@ -140,13 +145,13 @@ test("Stripe : montant serveur, session réutilisée, signature, mode et paiemen
   const eventId = "evt_" + randomUUID(); assert.equal((await event("checkout.session.async_payment_succeeded", { ...session, payment_status: "paid" }, eventId)).status, 200);
   assert.equal((await event("checkout.session.async_payment_succeeded", { ...session, payment_status: "paid" }, eventId)).status, 200);
   assert.equal((await db.quote.findUniqueOrThrow({ where: { id } })).paymentMode, "TEST");
-  assert.equal(await db.commercialWebhook.count({ where: { key: "stripe/" + eventId } }), 1);
+  assert.equal(await db.commercialWebhook.count({ where: { key: "stripe/zelyweb/" + eventId } }), 1);
   assert.equal(await db.commercialWebhook.count({ where: { key: `quote-owner/${id}/PAID` } }), 1);
   const ownerEmails = (await db.commercialEmail.findMany({ where: { kind: "SITE_OWNER_NOTICE" } })).map(row => unseal(row.payloadEncrypted!) as { to: string[]; subject: string; text: string; html: string });
   const paidNotice = ownerEmails.find(mail => mail.subject === "[TEST] Devis complémentaire payé");
   assert.ok(paidNotice); assert.deepEqual(paidNotice.to, ["contact@zelyweb.com"]); assert.ok(paidNotice.text.includes(`/devis/${id}`));
   assert.ok(!paidNotice.html.includes("#token="));
-  Object.assign(process.env, { STRIPE_SECRET_KEY: "", STRIPE_WEBHOOK_SECRET: "" }); globalThis.fetch = originalFetch;
+  Object.assign(process.env, { ZELYWEB_STRIPE_SECRET_KEY: "", ZELYWEB_STRIPE_WEBHOOK_SECRET: "" }); globalThis.fetch = originalFetch;
 });
 test("un retour client sur un devis notifie le propriétaire sans annoncer de paiement", async () => {
   const id = await commercialService.createQuote(h(), draft()); await commercialService.sendQuote(h(), id);
@@ -347,8 +352,8 @@ test("présentation, ajustements, domaines et invitation fonctionnent avec le co
   const url = new URL(process.env.DATABASE_URL!); url.username = "billing_runtime_admin"; url.password = password;
   const runtime = new PrismaClient({ adapter: new PrismaPg({ connectionString: url.href, max: 3, connectionTimeoutMillis: 5000 }) });
   const shared = globalThis as unknown as { leadPrisma: PrismaClient }, previous = shared.leadPrisma;
-  const previousStripeKey = process.env.STRIPE_SECRET_KEY;
-  process.env.STRIPE_SECRET_KEY = "sk_test_billing_permissions_fixture";
+  const previousStripeKey = process.env.ZELYWEB_STRIPE_SECRET_KEY;
+  process.env.ZELYWEB_STRIPE_SECRET_KEY = "sk_test_billing_permissions_fixture";
   shared.leadPrisma = runtime;
   try {
     const id = await adminService.convert(h(), lead.id);
@@ -380,8 +385,8 @@ test("présentation, ajustements, domaines et invitation fonctionnent avec le co
     await assert.rejects(runtime.activityLog.deleteMany({ where: { projectId: id } }));
   } finally {
     shared.leadPrisma = previous;
-    if (previousStripeKey === undefined) delete process.env.STRIPE_SECRET_KEY;
-    else process.env.STRIPE_SECRET_KEY = previousStripeKey;
+    if (previousStripeKey === undefined) delete process.env.ZELYWEB_STRIPE_SECRET_KEY;
+    else process.env.ZELYWEB_STRIPE_SECRET_KEY = previousStripeKey;
     await runtime.$disconnect();
   }
 });
@@ -411,4 +416,74 @@ test("le compte web restreint enregistre et confirme une demande sans accès aux
     await assert.rejects(runtime.user.findMany());
     await assert.rejects(runtime.lead.update({ where: { id: submitted.reference }, data: { deletedAt: new Date() } }));
   } finally { shared.leadPrisma = previous; await runtime.$disconnect(); }
+});
+
+
+test("deux espaces : meme email, dossiers et modeles independants, devis Tadapo et paiement sur son seul compte", async () => {
+  const envKeys = ["NEXT_PUBLIC_TADAPO_SITE_URL", "TADAPO_STRIPE_SECRET_KEY", "TADAPO_STRIPE_WEBHOOK_SECRET", "TADAPO_FROM_EMAIL", "TADAPO_CONTACT_EMAIL", "TADAPO_REPLY_DOMAIN", "ZELYWEB_STRIPE_SECRET_KEY"];
+  const previous = Object.fromEntries(envKeys.map(key => [key, process.env[key]]));
+  const fetchBefore = globalThis.fetch;
+  try {
+    Object.assign(process.env, { NEXT_PUBLIC_TADAPO_SITE_URL: "http://localhost:3002", TADAPO_FROM_EMAIL: "Tadapo <contact@tadapo.test>", TADAPO_CONTACT_EMAIL: "contact@tadapo.test", TADAPO_REPLY_DOMAIN: "reponses.tadapo.test" });
+    const source = await db.lead.findUniqueOrThrow({ where: { id: leadId } });
+    const { id: oldId, ...copy } = source;
+    assert.equal(oldId, leadId);
+    const other = await db.lead.create({ data: { ...copy, brand: "tadapo", requestId: randomUUID(), emailVerifiedAt: new Date() } });
+    const ht = new Headers({ cookie: cookie + "; admin-brand=tadapo" });
+    await workspaceDb(ht).financialEvent.findMany();
+    await workspaceDb(ht).billingInvoice.findMany();
+    assert.equal(other.email, source.email);
+    assert.equal(await commercialService.client(h(), other.id), null);
+    assert.equal(await commercialService.client(ht, source.id), null);
+    assert.equal((await commercialService.client(ht, other.id))?.id, other.id);
+    assert.ok((await commercialService.clients(ht)).rows.every(row => row.brand === "tadapo"));
+    assert.ok((await commercialService.clients(h())).rows.every(row => row.brand === "zelyweb"));
+    await commercialService.saveSettings(ht, brandSellerDefaults("tadapo"));
+    assert.ok((await commercialService.settings(ht)).terms.includes("Tadapo"));
+    assert.ok(!(await commercialService.settings(ht)).terms.includes("Zelyweb"));
+    const template = await commercialService.saveTemplate(ht, { kind: "message", label: "Modele propre", subject: "Bonjour", content: "Votre projet avance" });
+    assert.ok(!(await commercialService.templates(h())).messages.some(row => row.id === template.id));
+    assert.ok((await commercialService.templates(ht)).messages.some(row => row.id === template.id));
+    await assert.rejects(commercialService.message(h(), { leadId: other.id, requestId: randomUUID(), subject: "Bonjour", content: "Envoi depuis le mauvais espace" }));
+    const id = await commercialService.createQuote(ht, { ...draft(), leadId: other.id, terms: brandSellerDefaults("tadapo").terms });
+    await commercialService.sendQuote(ht, id);
+    const quote = await db.quote.findUniqueOrThrow({ where: { id } });
+    const snapshot = snapshotSchema.parse(quote.snapshot);
+    assert.equal(snapshot.brand, "tadapo"); assert.ok(!JSON.stringify(snapshot).toLowerCase().includes("zelyweb"));
+    assert.equal(await commercialService.quote(h(), id), null);
+    const token = await quoteToken(id);
+    const email = await db.commercialEmail.findFirstOrThrow({ where: { quoteId: id, kind: "QUOTE" } });
+    const mail = unseal(email.payloadEncrypted!) as { from: string; reply_to: string; text: string };
+    assert.ok(mail.from.includes("Tadapo")); assert.ok(mail.reply_to.endsWith("@reponses.tadapo.test"));
+    assert.ok(mail.text.includes("http://localhost:3002/client/devis/")); assert.ok(!mail.text.toLowerCase().includes("zelyweb"));
+    const request = (brand: "zelyweb" | "tadapo", body?: unknown) => new NextRequest(`http://localhost:${brand === "tadapo" ? 3002 : 3001}/api/client/quotes/${id}`, {
+      method: body ? "POST" : "GET", headers: { origin: `http://localhost:${brand === "tadapo" ? 3002 : 3001}`, "content-type": "application/json", cookie: `${quoteCookie(id, brand)}=${token}` }, ...(body ? { body: JSON.stringify(body) } : {}) });
+    assert.equal((await clientGet(request("zelyweb"), context(id))).status, 401);
+    assert.equal((await tadapoQuoteGet(request("tadapo"), context(id))).status, 200);
+    assert.equal((await access(new NextRequest("http://localhost:3001/api/client/quotes/access", { method: "POST", headers: { origin: "http://localhost:3001", "content-type": "application/json" }, body: JSON.stringify({ id, token }) }))).status, 401);
+    assert.equal((await tadapoAccess(new NextRequest("http://localhost:3002/api/client/tadapo/quotes/access", { method: "POST", headers: { origin: "http://localhost:3002", "content-type": "application/json" }, body: JSON.stringify({ id, token }) }))).status, 200);
+    const zelyQuote = await commercialService.createQuote(h(), draft()); await commercialService.sendQuote(h(), zelyQuote);
+    const zelyToken = await quoteToken(zelyQuote);
+    const cross = new NextRequest("http://localhost:3002/api/client/tadapo/quotes/" + zelyQuote, { headers: { cookie: `${quoteCookie(zelyQuote, "tadapo")}=${zelyToken}` } });
+    assert.equal((await tadapoQuoteGet(cross, context(zelyQuote))).status, 401);
+    assert.equal((await tadapoQuotePost(request("tadapo", { action: "accept", name: "Camille Test", agreement: true, documentHash: quote.documentHash }), context(id))).status, 200);
+    Object.assign(process.env, { TADAPO_STRIPE_SECRET_KEY: "sk_test_tadapo_separation", TADAPO_STRIPE_WEBHOOK_SECRET: "whsec_tadapo_separation", ZELYWEB_STRIPE_SECRET_KEY: "sk_test_zelyweb_separation" });
+    let fields = new URLSearchParams();
+    globalThis.fetch = async (url, init) => {
+      assert.equal(new Headers(init?.headers).get("authorization"), "Bearer sk_test_tadapo_separation");
+      if (String(url).includes("tax_rates")) return Response.json({ id: "txr_brand" });
+      fields = new URLSearchParams(String(init?.body));
+      return Response.json({ id: "cs_separate", url: "https://checkout.stripe.com/separate", expires_at: Math.floor(Date.now() / 1000) + 1800 });
+    };
+    assert.equal(await checkoutQuote(id), "https://checkout.stripe.com/separate");
+    assert.equal(fields.get("success_url"), `http://localhost:3002/client/devis/${id}?retour=paiement`);
+    assert.equal(fields.get("metadata[brand]"), "tadapo");
+    const event = { id: "evt_separate_brands", type: "checkout.session.completed", livemode: false, data: { object: { id: "cs_separate", metadata: { attemptId: fields.get("metadata[attemptId]"), quoteId: id, documentHash: quote.documentHash }, amount_total: quote.totalCents, currency: "eur", payment_status: "paid" } } };
+    const payload = JSON.stringify(event), signature = stripeClient("tadapo").webhooks.generateTestHeaderString({ payload, secret: process.env.TADAPO_STRIPE_WEBHOOK_SECRET! });
+    assert.equal((await tadapoStripeWebhook(new Request("http://localhost:3001/api/webhooks/stripe/tadapo", { method: "POST", body: payload, headers: { "stripe-signature": signature } }))).status, 200);
+    assert.equal((await db.quote.findUniqueOrThrow({ where: { id } })).status, "PAID");
+  } finally {
+    globalThis.fetch = fetchBefore;
+    for (const key of envKeys) { if (previous[key] === undefined) delete process.env[key]; else process.env[key] = previous[key]; }
+  }
 });

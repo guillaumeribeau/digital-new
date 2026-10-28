@@ -11,7 +11,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const latestPayment = await getDb().paymentAttempt.findFirst({ where: { quoteId: id }, orderBy: { createdAt: "desc" }, select: { status: true } });
     return Response.json({ id, status: quote.status === "SENT" && quote.validUntil <= new Date() ? "EXPIRED" : quote.status,
       snapshot: snapshotSchema.parse(quote.snapshot), documentHash: quote.documentHash, acceptedAt: quote.acceptedAt, acceptedName: quote.acceptedName,
-      paymentMode: quote.paymentMode || paymentMode(), paymentStatus: latestPayment?.status, paidAt: quote.paidAt }, { headers: { "Cache-Control": "private, no-store" } });
+      paymentMode: quote.paymentMode || paymentMode("zelyweb"), paymentStatus: latestPayment?.status, paidAt: quote.paidAt }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) { return commercialResponse(error); }
 }
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {

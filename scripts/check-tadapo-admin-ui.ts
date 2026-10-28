@@ -1,4 +1,4 @@
-import { chromium } from "@playwright/test";
+import { chromium, expect } from "@playwright/test";
 import { getDb } from "@nova/database";
 import { unseal } from "@nova/shared/secure-payload";
 import { mkdir } from "node:fs/promises";
@@ -18,7 +18,10 @@ async function main() {
     await page.getByLabel("Adresse e-mail", { exact: true }).fill("tadapo-admin@example.com");
     await page.getByLabel("Mot de passe", { exact: true }).fill("Tadapo-Test-Password-42!");
     await page.getByRole("button", { name: "Accéder à mon espace" }).click(); await page.waitForURL(`${admin}/`);
-    await page.goto(`${admin}/projets?brand=tadapo`); await page.getByText("Tadapo intégration", { exact: false }).first().waitFor();
+    await page.getByLabel("Marque active").selectOption("tadapo");
+    await page.getByRole("button", { name: "Ouvrir cet espace" }).click();
+    await page.waitForURL(`${admin}/`);
+    await page.goto(`${admin}/projets`); await page.getByText("Tadapo intégration", { exact: false }).first().waitFor();
     await page.goto(`${admin}/projets/${order.projectId}`);
     await page.getByRole("heading", { name: "Réalisation Tadapo" }).waitFor();
     assert.equal(await page.getByText("Préparer la présentation du site", { exact: true }).count(), 0);
@@ -31,6 +34,23 @@ async function main() {
     const client = await clientContext.newPage(); client.on("pageerror", e => errors.push(e.message));
     await client.goto(`${site}/suivi/${order.id}#token=${token}`);
     await client.getByRole("heading", { name: "Votre projet Tadapo." }).waitFor();
+    for(const round of [2,3]){
+      const reviews=client.locator('#retours');
+      await reviews.getByRole('heading',{name:`Série ${round}/3${round===3?' — dernière série':''}`,exact:true}).waitFor();
+      await reviews.getByLabel('Votre nom',{exact:true}).last().fill('Camille Navigateur');
+      await reviews.getByLabel('Vos retours regroupés',{exact:true}).fill(`Série ${round} : remplacer le texte de présentation.`);
+      await reviews.getByRole('button',{name:'Envoyer cette série de retours',exact:true}).click();
+      await client.getByText(`Votre série ${round}/3 est reçue.`,{exact:false}).waitFor();
+      assert.equal(await client.getByRole('button',{name:'Envoyer cette série de retours',exact:true}).count(),0);
+      await page.reload();
+      const delivery=page.locator('form').filter({has:page.locator('input[name=action][value=stage]')});
+      await delivery.getByLabel('Lien de la version à livrer').fill(`https://preview.example.com/serie-${round}-corrigee`);
+      await delivery.getByRole('button',{name:'Envoyer la version corrigée et son e-mail',exact:true}).click();
+      await expect.poll(async()=>(await db.tadapoOrder.findUniqueOrThrow({where:{id:order.id}})).stage).toBe('PREVIEW_SENT');
+      await client.reload();
+    }
+    await client.getByText('Les trois séries incluses sont terminées.',{exact:false}).waitFor();
+    assert.equal(await client.getByRole('button',{name:'Envoyer cette série de retours',exact:true}).count(),0);
     await client.getByRole("button", { name: "Valider cette version", exact: true }).waitFor();
     await client.getByLabel("Votre nom", { exact: true }).first().fill("Camille Navigateur");
     await client.getByRole("button", { name: "Valider cette version", exact: true }).click();
@@ -39,14 +59,25 @@ async function main() {
     assert.ok(await client.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
     await client.screenshot({ path: "reports/tadapo-admin/suivi-mobile.png", fullPage: true });
     await page.reload(); const stageForm = page.locator('form').filter({ has: page.locator('input[name=action][value=stage]') });
-    await stageForm.locator('select[name=stage]').selectOption("PUBLISHED"); await stageForm.getByRole("button", { name: "Valider l’étape" }).click();
-    await stageForm.getByRole("status").waitFor();
+    await stageForm.getByRole("button", { name: "Valider : En ligne" }).click();
+    await expect.poll(async()=>(await db.tadapoOrder.findUniqueOrThrow({where:{id:order.id}})).stage).toBe('PUBLISHED');
     assert.equal((await db.tadapoOrder.findUniqueOrThrow({ where: { id: order.id } })).stage, "PUBLISHED");
-    await page.goto(`${admin}/clients?brand=tadapo`); await page.getByText("Tadapo intégration", { exact: true }).waitFor();
+    await client.reload();
+    const monthly=client.locator('#modifications');
+    await monthly.getByRole('heading',{name:'Vos modifications mensuelles',exact:true}).waitFor();
+    await monthly.getByLabel('Votre nom',{exact:true}).fill('Camille Navigateur');
+    await monthly.getByLabel('Une modification à réaliser',{exact:true}).fill('Remplacer les horaires du samedi.');
+    await monthly.getByRole('button',{name:'Transmettre cette modification',exact:true}).click();
+    await monthly.getByText('1/1 modification(s) demandée(s)',{exact:false}).waitFor();
+    assert.equal(await monthly.getByRole('button',{name:'Transmettre cette modification',exact:true}).count(),0);
+    assert.ok(!(await monthly.innerText()).includes('minute'));
+    assert.ok(await client.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+    await client.screenshot({path:'reports/tadapo-admin/modifications-mobile.png',fullPage:true});
+    await page.goto(`${admin}/clients?brand=tadapo`); await page.getByText("Tadapo intégration", { exact: true }).first().waitFor();
     await page.goto(`${admin}/commandes-tadapo`); await page.getByRole("heading", { name: "Commandes et abonnements." }).waitFor();
     await page.screenshot({ path: "reports/tadapo-admin/commandes.png", fullPage: true });
     assert.deepEqual(errors, []);
-    console.log("Tadapo navigateur : filtre de marque, dossier admin, fichier privé, validation client mobile et publication manuelle — OK.");
+    console.log("Tadapo navigateur : retours 2/3 et 3/3 bloqués entre livraisons, validation finale, domaine séparé, publication et quota mensuel mobile — OK.");
   } finally { await browser.close(); await db.$disconnect(); }
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

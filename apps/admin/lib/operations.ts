@@ -1,20 +1,21 @@
+import { workspaceDb } from "./brand-context";
 import { leadStatusForStage } from "@nova/shared";
-import { getDb, type Prisma, type ProjectStage } from "@nova/database";
+import { type Prisma, type ProjectStage } from "@nova/database";
 import { z } from "zod";
 import { authenticate } from "./access";
 import { CommercialError, seal } from "./commercial-core";
 export async function resendEmail(h: Headers, id: string, requestId: string) {
   await authenticate(h); z.uuid().parse(id); z.uuid().parse(requestId);
-  return getDb().$transaction(async tx => {
+  return workspaceDb(h).$transaction(async tx => {
     await tx.$queryRaw`SELECT "id" FROM "CommercialEmail" WHERE "id" = ${id}::uuid FOR UPDATE`;
     if (await tx.commercialEmail.findUnique({ where: { manualRequestId: requestId } })) return;
     const e = await tx.commercialEmail.findUniqueOrThrow({ where: { id }, include: { quote: true, siteOrder: { include: { project: { include: { lead: true } } } } } });
-    if (["PENDING", "PROCESSING", "CANCELLED"].includes(e.status) || e.kind === "SITE_OWNER_NOTICE" || e.quote && !["SENT", "ACCEPTED"].includes(e.quote.status) || e.siteOrder && (e.siteOrder.project.lead.deletedAt || e.siteOrder.project.stage === "CANCELLED" || e.kind === "SITE_PRESENTATION" && !!e.siteOrder.creationPaidAt || e.kind === "SITE_REVISION_REQUEST" && !!e.siteOrder.subscriptionInviteSentAt || e.kind === "SITE_SUBSCRIPTION_INVITE" && !!e.siteOrder.firstSubscriptionPaidAt)) throw new CommercialError("INVALID_ACTION");
+    if (["PENDING", "PROCESSING", "CANCELLED"].includes(e.status) || ["SITE_OWNER_NOTICE","TADAPO_OWNER_NOTICE"].includes(e.kind) || e.quote && !["SENT", "ACCEPTED"].includes(e.quote.status) || e.siteOrder && (e.siteOrder.project.lead.deletedAt || e.siteOrder.project.stage === "CANCELLED" || e.kind === "SITE_PRESENTATION" && !!e.siteOrder.creationPaidAt || e.kind === "SITE_REVISION_REQUEST" && !!e.siteOrder.subscriptionInviteSentAt || e.kind === "SITE_SUBSCRIPTION_INVITE" && !!e.siteOrder.firstSubscriptionPaidAt)) throw new CommercialError("INVALID_ACTION");
     let payload = e.payloadEncrypted;
     if (!payload && e.siteOrder) { const { rebuildSiteEmail } = await import("./site-billing"); payload = seal(rebuildSiteEmail(e.siteOrder, e.kind)); }
     if (!payload) throw new CommercialError("INVALID_ACTION");
     if (await tx.commercialEmail.findFirst({ where: { resendOfId: id, status: { in: ["PENDING", "PROCESSING"] } } })) throw new CommercialError("REMINDER_PENDING");
-    await tx.commercialEmail.create({ data: { tadapoOrderId: e.tadapoOrderId, siteOrderId: e.siteOrderId, quoteId: e.quoteId, kind: e.kind, payloadEncrypted: payload, resendOfId: id, manualRequestId: requestId, expiresAt: new Date(Date.now() + 23 * 3600000) } });
+    await tx.commercialEmail.create({ data: { brand: e.brand, tadapoOrderId: e.tadapoOrderId, siteOrderId: e.siteOrderId, quoteId: e.quoteId, kind: e.kind, payloadEncrypted: payload, resendOfId: id, manualRequestId: requestId, expiresAt: new Date(Date.now() + 23 * 3600000) } });
   });
 }
 export async function financialStage(tx: Prisma.TransactionClient, projectId: string, stage: "PREVIEW_SENT" | "AWAITING_PAYMENT" | "PAID") {

@@ -1,9 +1,15 @@
+import { type Brand, assertBrandContent } from "@nova/shared/brands";
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
 import { z } from "zod";
 
 export class CommercialError extends Error {}
-export function publicOrigin() {
-  const url = new URL(process.env.COMMERCIAL_PUBLIC_URL || process.env.BETTER_AUTH_URL || "");
+// Legacy names remain a Zelyweb-only fallback during the configuration migration.
+// An explicitly empty new variable disables it instead of reviving an old key.
+export const zelywebStripeKey = () => process.env.ZELYWEB_STRIPE_SECRET_KEY ?? process.env.STRIPE_SECRET_KEY;
+export const zelywebStripeWebhookSecret = () => process.env.ZELYWEB_STRIPE_WEBHOOK_SECRET ?? process.env.STRIPE_WEBHOOK_SECRET;
+export function publicOrigin(brand: Brand = "zelyweb") {
+  const url = new URL(brand === "tadapo" ? process.env.NEXT_PUBLIC_TADAPO_SITE_URL || "https://tadapo.com" : process.env.COMMERCIAL_PUBLIC_URL || process.env.BETTER_AUTH_URL || "");
+  assertBrandContent(brand, url.hostname);
   if (process.env.COMMERCIAL_MODE === "local" && (process.env.NODE_ENV === "production" || !["localhost", "127.0.0.1", "[::1]"].includes(url.hostname))) throw new CommercialError("CONFIGURATION_REQUIRED");
   if (url.username || url.password || (url.protocol !== "https:" && !(process.env.NODE_ENV !== "production" && url.protocol === "http:" && ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname)))) throw new CommercialError("CONFIGURATION_REQUIRED");
   return url.origin;
@@ -12,21 +18,23 @@ export function commercialLocal() {
   if (process.env.NODE_ENV === "production" || process.env.COMMERCIAL_MODE !== "local") return false;
   try { return ["localhost", "127.0.0.1", "[::1]"].includes(new URL(publicOrigin()).hostname); } catch { return false; }
 }
-export function paymentMode() {
-  const key = process.env.STRIPE_SECRET_KEY || "";
+export function paymentMode(brand: Brand = "zelyweb") {
+  const key = (brand === "tadapo" ? process.env.TADAPO_STRIPE_SECRET_KEY : zelywebStripeKey()) || "";
   if (process.env.COMMERCIAL_MODE === "local" && (!commercialLocal() || key.startsWith("sk_live_"))) return "UNCONFIGURED";
   if (key.startsWith("sk_test_")) return "TEST";
   if (key.startsWith("sk_live_")) return "LIVE";
   return commercialLocal() && !key ? "LOCAL" : "UNCONFIGURED";
 }
-export function sender() {
-  const value = process.env.COMMERCIAL_FROM_EMAIL;
-  if (value) return value;
-  if (commercialLocal()) return "Zelyweb Local <no-reply@nova.test>";
+export function sender(brand: Brand = "zelyweb") {
+  const value = brand === "tadapo" ? process.env.TADAPO_FROM_EMAIL : process.env.COMMERCIAL_FROM_EMAIL;
+  if (value) { assertBrandContent(brand, value); return value; }
+  if (commercialLocal()) return brand === "tadapo" ? "Tadapo Local <no-reply@tadapo.test>" : "Zelyweb Local <no-reply@nova.test>";
   throw new CommercialError("CONFIGURATION_REQUIRED");
 }
-export function replyAddress(token: string) {
-  const domain = process.env.COMMERCIAL_REPLY_DOMAIN || (commercialLocal() ? "reponses.nova.test" : "");
+export function replyAddress(token: string, brand: Brand = "zelyweb") {
+  if (brand === "tadapo" && !process.env.TADAPO_REPLY_DOMAIN) return process.env.TADAPO_CONTACT_EMAIL || "contact@tadapo.com";
+  const domain = (brand === "tadapo" ? process.env.TADAPO_REPLY_DOMAIN : process.env.COMMERCIAL_REPLY_DOMAIN) || (commercialLocal() ? "reponses.nova.test" : "");
+  assertBrandContent(brand, domain);
   if (!/^[a-z0-9.-]+\.[a-z]{2,}$/i.test(domain)) throw new CommercialError("CONFIGURATION_REQUIRED");
   return `r-${token}@${domain}`;
 }
@@ -73,6 +81,7 @@ export function calculate(items: z.infer<typeof quoteInput>["items"]) {
   return { lines, subtotalCents, taxCents, totalCents: subtotalCents + taxCents };
 }
 export const snapshotSchema = z.object({
+  brand: z.enum(["zelyweb", "tadapo"]).default("zelyweb"),
   number: z.string(), title: z.string(), createdAt: z.string(), validUntil: z.string(), deliveryTime: z.string(), terms: z.string(),
   seller: z.object({ legalName: z.string().min(2), address: z.string().min(5), registrationNumber: z.string().min(2), vatNumber: z.string(), taxNote: z.string(), email: z.email().optional() }),
   buyer: z.object({ company: z.string(), name: z.string(), email: z.email(), address: z.string(), registrationNumber: z.string().default(""), vatNumber: z.string().default("") }),

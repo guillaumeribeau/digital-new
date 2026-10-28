@@ -1,6 +1,6 @@
+import { workspaceDb } from "../../lib/brand-context";
 import { NextActions } from "../../components/next-actions";
 import Link from "next/link";
-import { getDb } from "@nova/database";
 import { headers } from "next/headers";
 import { Inbox, FolderKanban, Send, ArrowUpRight, CheckCircle2, Layers3, ListFilter, Globe2 } from "lucide-react";
 import { requireAdmin } from "../../lib/access";
@@ -9,7 +9,7 @@ import { PageTitle, Status, Empty, date } from "../../components/ui";
 export default async function Dashboard() {
   await requireAdmin();
   const data = await adminService.dashboard(await headers());
-  const billingAlerts = await getDb().siteOrder.count({ where: { billingAlert: true } });
+  const billingAlerts = await workspaceDb(await headers()).siteOrder.count({ where: { billingAlert: true } });
   const cards = [["Demandes reçues", data.total, Inbox], ["Nouvelles demandes", data.newLeads, Layers3], ["À qualifier", data.toQualify, ListFilter],
     ["Sites en création", data.inCreation, FolderKanban], ["Propositions envoyées", data.proposals, Send], ["Propositions acceptées", data.approved, CheckCircle2],
     ["Projets terminés", data.completed, Globe2], ["E-mails à vérifier", data.pendingVerification, Inbox]] as const;

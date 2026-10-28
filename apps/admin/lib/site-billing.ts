@@ -1,3 +1,4 @@
+import { workspaceDb } from "./brand-context";
 import { financialStage } from "./operations";
 import { requireWorkflowReady } from "./project-workflow";
 import { randomBytes, randomUUID } from "node:crypto";
@@ -39,7 +40,7 @@ export function rebuildSiteEmail(o: SiteOrder & { project: { lead: { fullName: s
 }
 export async function resendCurrentSiteEmail(h: Headers, id: string, requestId: string) {
   const actor = await authenticate(h); z.uuid().parse(id); z.uuid().parse(requestId);
-  await getDb().$transaction(async tx => {
+  await workspaceDb(h).$transaction(async tx => {
     await tx.$queryRaw`SELECT "id" FROM "SiteOrder" WHERE "id" = ${id}::uuid FOR UPDATE`;
     if (await tx.commercialEmail.findUnique({ where: { manualRequestId: requestId } })) return;
     const o = await tx.siteOrder.findUniqueOrThrow({ where: { id }, include: { project: { include: { lead: true } } } }); modeCheck(o);
@@ -65,10 +66,11 @@ export async function saveSitePresentation(h: Headers, input: unknown) {
   const img = await sharp(Buffer.from(bytes[2], "base64"), { limitInputPixels: 16000000 }).rotate().resize({ width: 1200, withoutEnlargement: true }).jpeg({ quality: 75 }).toBuffer();
   if (img.length > 170000) throw new CommercialError("INVALID_ACTION");
   const token = randomBytes(32).toString("base64url");
-  return getDb().$transaction(async tx => {
+  return workspaceDb(h).$transaction(async tx => {
     await tx.$queryRaw`SELECT "id" FROM "Project" WHERE "id" = ${data.projectId}::uuid FOR UPDATE`;
     const project = await tx.project.findUniqueOrThrow({ where: { id: data.projectId }, include: { lead: true, siteOrder: true } });
     if (!project.lead.emailVerifiedAt || project.lead.deletedAt || project.stage === "CANCELLED") throw new CommercialError("CLIENT_UNVERIFIED");
+    if (project.lead.brand !== "zelyweb") throw new CommercialError("INVALID_ACTION");
     const old = project.siteOrder;
     if (old?.status && old.status !== "DRAFT") throw new CommercialError("IMMUTABLE_QUOTE");
     if ((old?.version || 0) !== data.expectedVersion) throw new CommercialError("STALE_QUOTE");
@@ -80,7 +82,7 @@ export async function saveSitePresentation(h: Headers, input: unknown) {
 }
 export async function sendSitePresentation(h: Headers, id: string, version: number) {
   const actor = await authenticate(h); publicOrigin(); sender();
-  await getDb().$transaction(async tx => {
+  await workspaceDb(h).$transaction(async tx => {
     await tx.$queryRaw`SELECT "id" FROM "SiteOrder" WHERE "id" = ${id}::uuid FOR UPDATE`;
     const order = await tx.siteOrder.findUniqueOrThrow({ where: { id }, include: { project: { include: { lead: true } } } });
     modeCheck(order);
@@ -141,7 +143,7 @@ export async function checkoutSite(id: string, input: unknown) {
 export async function prepareRevisionEmail(h: Headers, id: string, message: string) {
   await authenticate(h);
   const text = z.string().trim().min(10).max(5000).parse(message);
-  return getDb().$transaction(async tx => {
+  return workspaceDb(h).$transaction(async tx => {
     await tx.$queryRaw`SELECT "id" FROM "SiteOrder" WHERE "id" = ${id}::uuid FOR UPDATE`;
     const o = await tx.siteOrder.findUniqueOrThrow({ where: { id }, include: { project: { include: { lead: true } } } }); modeCheck(o);
     if (!o.creationPaidAt || o.project.stage === "CANCELLED" || o.project.lead.deletedAt) throw new CommercialError("PAYMENT_REQUIRED");
@@ -152,7 +154,7 @@ export async function prepareRevisionEmail(h: Headers, id: string, message: stri
 }
 export async function sendRevisionEmail(h: Headers, id: string, version: number) {
   const actor = await authenticate(h);
-  await getDb().$transaction(async tx => {
+  await workspaceDb(h).$transaction(async tx => {
     await tx.$queryRaw`SELECT "id" FROM "SiteOrder" WHERE "id" = ${id}::uuid FOR UPDATE`;
     const o = await tx.siteOrder.findUniqueOrThrow({ where: { id }, include: { project: { include: { lead: true } } } }); modeCheck(o);
     if (!o.creationPaidAt || o.project.stage === "CANCELLED" || o.project.lead.deletedAt) throw new CommercialError("PAYMENT_REQUIRED");
@@ -176,7 +178,7 @@ function invitationData(o: SiteOrder & { project: { lead: { fullName: string; bu
 }
 export async function prepareSiteSubscription(h: Headers, id: string) {
   await authenticate(h);
-  return getDb().$transaction(async tx => {
+  return workspaceDb(h).$transaction(async tx => {
     await tx.$queryRaw`SELECT "id" FROM "SiteOrder" WHERE "id" = ${id}::uuid FOR UPDATE`;
     const o = await tx.siteOrder.findUniqueOrThrow({ where: { id }, include: { project: { include: { lead: true } } } });
     subscriptionReady(o);
@@ -188,7 +190,7 @@ export async function prepareSiteSubscription(h: Headers, id: string) {
 }
 export async function sendSiteSubscription(h: Headers, id: string, version: number) {
   const actor = await authenticate(h); sender();
-  await getDb().$transaction(async tx => {
+  await workspaceDb(h).$transaction(async tx => {
     await tx.$queryRaw`SELECT "id" FROM "SiteOrder" WHERE "id" = ${id}::uuid FOR UPDATE`;
     const o = await tx.siteOrder.findUniqueOrThrow({ where: { id }, include: { project: { include: { lead: true } } } });
     subscriptionReady(o);

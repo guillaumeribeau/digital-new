@@ -19,6 +19,7 @@ function failure(error: unknown): CommercialActionResult {
     INVALID_ACTION: "Cette action n’est pas disponible dans l’état actuel.",
     REMINDER_PENDING: "Une relance est déjà en attente d’envoi. Aucun doublon n’a été créé.", REMINDER_LIMIT: "Ce devis a déjà fait l’objet de six relances. Contactez le client directement.",
   };
+  if (error instanceof Error && error.message === "CROSS_BRAND_CONTENT") return { error: "Le contenu mentionne l’autre marque. Corrigez les coordonnées ou le texte avant l’envoi." };
   if (error instanceof AdminAccessError) return { error: "Reconnectez-vous avec votre compte administrateur." };
   if (error instanceof CommercialError) return { error: messages[error.message] || "L’opération n’est pas disponible." };
   if (error instanceof z.ZodError) return { error: error.issues[0]?.message || "Vérifiez les informations." };
@@ -34,7 +35,7 @@ export async function commercialAction(_previous: CommercialActionResult, form: 
     else if (operation === "archive-template") await commercialService.archiveTemplate(h, z.uuid().parse(form.get("id")), String(form.get("kind")));
     else if (operation === "send-quote") await commercialService.sendQuote(h, z.uuid().parse(form.get("id")));
     else if (operation === "cancel" || operation === "complete") await commercialService.changeQuote(h, z.uuid().parse(form.get("id")), operation);
-    else if (operation === "remind") { await authenticate(h); await queueQuoteReminder(z.uuid().parse(form.get("id")), true); }
+    else if (operation === "remind") { await authenticate(h); if (!await commercialService.quote(h, z.uuid().parse(form.get("id")))) throw new CommercialError("INVALID_ACTION"); await queueQuoteReminder(z.uuid().parse(form.get("id")), true); }
     else throw new CommercialError("INVALID_ACTION");
     revalidatePath("/", "layout");
     return { success: operation === "send-quote" || operation === "message" || operation === "remind" ? "E-mail ajouté à la file d’envoi." : "Modification enregistrée." };

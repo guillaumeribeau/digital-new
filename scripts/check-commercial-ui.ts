@@ -26,7 +26,7 @@ async function main() {
     for (const path of ["/clients", "/echanges", "/devis", "/paiements", "/parametres/commercial", "/emails-locaux"]) { await page.goto(base + path); await page.waitForURL("**/connexion"); }
     await page.getByLabel("Adresse e-mail", { exact: true }).fill(user.email); await page.getByLabel("Mot de passe", { exact: true }).fill(password); await page.getByRole("button", { name: "Accéder à mon espace" }).click(); await page.waitForURL(base + "/");
     await page.goto(base + "/parametres/commercial");
-    await page.getByRole("button", { name: "Reprendre les informations et conditions Zelyweb", exact: true }).click();
+    await page.getByRole("button", { name: "Reprendre les informations de cette marque", exact: true }).click();
     assert.equal(await page.getByLabel("Raison sociale / nom de l’entreprise").inputValue(), business.legalName);
     assert.equal(await page.getByLabel("Immatriculation (SIRET ou équivalent)").inputValue(), business.siret);
     assert.equal(await page.getByLabel("N° TVA · facultatif").inputValue(), business.vatNumber);

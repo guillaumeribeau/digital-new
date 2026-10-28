@@ -61,7 +61,7 @@ async function main() {
     COMMERCIAL_MODE: "local", COMMERCIAL_PUBLIC_URL: "http://localhost:3001", COMMERCIAL_ENCRYPTION_KEY: randomBytes(32).toString("base64"),
     COMMERCIAL_FROM_EMAIL: "NOVA Test <sender@example.com>", COMMERCIAL_REPLY_DOMAIN: "reponses.nova.test",
     GA4_PROPERTY_ID: "559264383", GA4_SERVICE_ACCOUNT_EMAIL: "", GA4_SERVICE_ACCOUNT_PRIVATE_KEY: "",
-    STRIPE_SECRET_KEY: "", STRIPE_WEBHOOK_SECRET: "", RESEND_WEBHOOK_SECRET: "",
+    ZELYWEB_STRIPE_SECRET_KEY: "", ZELYWEB_STRIPE_WEBHOOK_SECRET: "", TADAPO_STRIPE_SECRET_KEY: "", TADAPO_STRIPE_WEBHOOK_SECRET: "", TADAPO_REPLY_DOMAIN: "", RESEND_WEBHOOK_SECRET: "",
   };
   try {
     await postgres.initialise();
@@ -74,22 +74,24 @@ async function main() {
     await run(["--import", "tsx", "--test", "tests/integration/commercial.test.ts"], env);
     await run(["--import", "tsx", "--test", "tests/integration/site-billing.test.ts"], env);
     await run(["--import", "tsx", "--test", "tests/integration/tadapo.test.ts"], env);
-    if (process.argv.includes("--tadapo-ui") || process.argv.includes("--ui") || process.argv.includes("--commercial-ui") || process.argv.includes("--trash-ui") || process.argv.includes("--billing-ui") || process.argv.includes("--operations-ui")) {
+    if (process.argv.includes("--brands-ui") || process.argv.includes("--tadapo-ui") || process.argv.includes("--ui") || process.argv.includes("--commercial-ui") || process.argv.includes("--trash-ui") || process.argv.includes("--billing-ui") || process.argv.includes("--operations-ui")) {
       const adminPort = await freePort(), websitePort = await freePort();
       const uiEnv: NodeJS.ProcessEnv & { BETTER_AUTH_URL: string; NEXT_PUBLIC_SITE_URL: string } = { ...env, BETTER_AUTH_URL: `http://127.0.0.1:${adminPort}`, NEXT_PUBLIC_SITE_URL: `http://127.0.0.1:${websitePort}`, NEXT_PUBLIC_GTM_ID: "", NEXT_TELEMETRY_DISABLED: "1" };
       Object.assign(uiEnv, { LEAD_EMAIL_MODE: "local", LOCAL_EMAIL_PREVIEW_TOKEN: randomBytes(32).toString("hex") });
       Object.assign(uiEnv, { COMMERCIAL_PUBLIC_URL: uiEnv.BETTER_AUTH_URL });
-      if (process.argv.includes("--tadapo-ui")) Object.assign(uiEnv, { NEXT_PUBLIC_TADAPO_SITE_URL: uiEnv.NEXT_PUBLIC_SITE_URL, STRIPE_SECRET_KEY: "sk_test_tadapo_ui_fixture", TADAPO_FROM_EMAIL: "Tadapo <contact@tadapo.test>", TADAPO_CONTACT_EMAIL: "contact@tadapo.test" });
-      if (process.argv.includes("--billing-ui")) uiEnv.STRIPE_SECRET_KEY = "sk_test_billing_ui_fixture";
+      if (process.argv.includes("--brands-ui")) Object.assign(uiEnv, { NEXT_PUBLIC_TADAPO_SITE_URL: uiEnv.NEXT_PUBLIC_SITE_URL, TADAPO_ADMIN_API_URL: uiEnv.BETTER_AUTH_URL, TADAPO_FROM_EMAIL: "Tadapo <contact@tadapo.test>", TADAPO_CONTACT_EMAIL: "contact@tadapo.test" });
+      if (process.argv.includes("--tadapo-ui")) Object.assign(uiEnv, { NEXT_PUBLIC_TADAPO_SITE_URL: uiEnv.NEXT_PUBLIC_SITE_URL, TADAPO_STRIPE_SECRET_KEY: "sk_test_tadapo_ui_fixture", TADAPO_FROM_EMAIL: "Tadapo <contact@tadapo.test>", TADAPO_CONTACT_EMAIL: "contact@tadapo.test" });
+      if (process.argv.includes("--billing-ui")) uiEnv.ZELYWEB_STRIPE_SECRET_KEY = "sk_test_billing_ui_fixture";
       const nextEnv: NodeJS.ProcessEnv = { ...uiEnv, NODE_ENV: "development", NOVA_UI_TEST: "1", TADAPO_UI_TEST: "1" };
       const servers: ChildProcess[] = [];
       const generatedFiles = ["apps/admin/tsconfig.json", "apps/admin/next-env.d.ts", "apps/website/tsconfig.json", "apps/website/next-env.d.ts", "apps/tadapo/tsconfig.json", "apps/tadapo/next-env.d.ts"];
       const previousFiles = await Promise.all(generatedFiles.map(async (file) => ({ file, text: await readFile(file, "utf8") })));
       try {
         servers.push(spawn(process.execPath, ["node_modules/next/dist/bin/next", "dev", "apps/admin", "--hostname", "127.0.0.1", "--port", String(adminPort)], { env: nextEnv, windowsHide: true, stdio: "inherit" }));
-        servers.push(spawn(process.execPath, ["node_modules/next/dist/bin/next", "dev", process.argv.includes("--tadapo-ui") ? "apps/tadapo" : "apps/website", "--hostname", "127.0.0.1", "--port", String(websitePort)], { env: nextEnv, windowsHide: true, stdio: "inherit" }));
+        servers.push(spawn(process.execPath, ["node_modules/next/dist/bin/next", "dev", (process.argv.includes("--brands-ui") || process.argv.includes("--tadapo-ui")) ? "apps/tadapo" : "apps/website", "--hostname", "127.0.0.1", "--port", String(websitePort)], { env: nextEnv, windowsHide: true, stdio: "inherit" }));
         await Promise.all([ready(uiEnv.BETTER_AUTH_URL + "/connexion"), ready(uiEnv.NEXT_PUBLIC_SITE_URL + "/")]);
-        if (process.argv.includes("--tadapo-ui")) await run(["--import", "tsx", "scripts/check-tadapo-admin-ui.ts"], uiEnv);
+        if (process.argv.includes("--brands-ui")) await run(["--import", "tsx", "scripts/check-brand-spaces-ui.ts"], uiEnv);
+        else if (process.argv.includes("--tadapo-ui")) await run(["--import", "tsx", "scripts/check-tadapo-admin-ui.ts"], uiEnv);
         else if (process.argv.includes("--billing-ui")) await run(["--import", "tsx", "scripts/check-site-billing-ui.ts"], uiEnv);
         else if (process.argv.includes("--operations-ui")) await run(["--import", "tsx", "scripts/check-operations-ui.ts"], uiEnv);
         else if (process.argv.includes("--trash-ui")) await run(["--import", "tsx", "scripts/check-lead-trash-ui.ts"], uiEnv);

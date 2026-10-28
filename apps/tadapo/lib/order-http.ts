@@ -40,6 +40,15 @@ export async function readOrderBody(request: Request) {
 }
 export function orderError(error: unknown) {
   const code = error instanceof TadapoError ? error.message : error instanceof ZodError ? "INVALID_INPUT" : "UNAVAILABLE";
+  const workflowMessages: Record<string,string> = {
+    REVIEW_WAITING:'Vos retours sont déjà transmis. Attendez la version corrigée avant la série suivante.',
+    REVIEW_CLOSED:'La période des retours inclus est terminée. Vous pouvez demander un devis complémentaire.',
+    REVIEW_LIMIT:'Les trois séries incluses sont terminées. Validez le site ou demandez un devis complémentaire.',
+    MONTHLY_LIMIT:'Toutes les modifications de cette période ont été demandées. Vous pouvez demander un devis complémentaire.',
+    MONTHLY_UNAVAILABLE:'Les modifications mensuelles sont disponibles après mise en ligne, avec un abonnement actif et à jour.',
+    STALE_VERSION:'La version a changé. Actualisez votre suivi avant de réessayer.'
+  };
+  if(workflowMessages[code])return Response.json({code,error:workflowMessages[code]},{status:409,headers:privateHeaders});
   const status = code === "UNAUTHORIZED" ? 401 : code === "RATE_LIMIT" ? 429 : code === "ORIGIN" ? 403 : code === "TOO_LARGE" ? 413 : ["REQUEST_CONFLICT", "CHECKOUT_EXPIRED", "ALREADY_PAID"].includes(code) ? 409 : ["FORMAT", "BODY", "INVALID_INPUT", "INVALID_ACTION", "MESSAGE_REQUIRED"].includes(code) ? 400 : 503;
   const message = status === 503 ? "Le service de commande est momentanément indisponible. Aucun succès de paiement n’est confirmé. Réessayez dans un instant." : code === "CHECKOUT_EXPIRED" ? "Cette tentative a expiré. Actualisez la page pour recommencer." : status === 401 ? "Ce lien personnel est invalide." : status === 429 ? "Trop de tentatives. Réessayez dans quelques minutes." : "Vérifiez vos informations et actualisez la page avant de réessayer.";
   return Response.json({ code, error: message }, { status, headers: privateHeaders });

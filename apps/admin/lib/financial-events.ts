@@ -1,13 +1,14 @@
+import { type Brand } from "@nova/shared/brands";
 import Stripe from "stripe";
 import { getDb } from "@nova/database";
 import { stripeClient } from "./commercial-payment";
 import { CommercialError, paymentMode } from "./commercial-core";
 import { queueOwnerNotification } from "./owner-notifications";
-export async function applyFinancialEvent(event: Stripe.Event) {
+export async function applyFinancialEvent(event: Stripe.Event, brand: Brand = "zelyweb") {
   const refund = ["charge.refunded", "refund.created", "refund.updated", "refund.failed"].includes(event.type);
   if (!refund && !event.type.startsWith("charge.dispute.")) return;
-  const stripe = stripeClient(), mode = event.livemode ? "LIVE" : "TEST";
-  if (mode !== paymentMode()) throw new CommercialError("INVALID_ACTION");
+  const stripe = stripeClient(brand), mode = event.livemode ? "LIVE" : "TEST";
+  if (mode !== paymentMode(brand)) throw new CommercialError("INVALID_ACTION");
   const raw = event.data.object as Stripe.Charge | Stripe.Refund | Stripe.Dispute;
   const dispute = !refund ? await stripe.disputes.retrieve(raw.id) : null;
   const currentRefund = refund && event.type.startsWith("refund.") ? await stripe.refunds.retrieve(raw.id) : null;
@@ -25,10 +26,10 @@ export async function applyFinancialEvent(event: Stripe.Event) {
     if (ref) { const invoice = await stripe.invoices.retrieve(typeof ref === "string" ? ref : ref.id); siteOrderId = invoice.metadata?.siteOrderId || invoice.parent?.subscription_details?.metadata?.siteOrderId || ""; quoteId = invoice.metadata?.quoteId || ""; }
   }
   if (!siteOrderId && !quoteId) return;
-  const order = siteOrderId ? await getDb().siteOrder.findUnique({ where: { id: siteOrderId }, include: { project: { select: { leadId: true, lead: { select: { businessName: true } } } } } }) : null;
-  const quote = quoteId ? await getDb().quote.findUnique({ where: { id: quoteId } }) : null;
+  const order = siteOrderId ? await getDb().siteOrder.findUnique({ where: { id: siteOrderId }, include: { project: { select: { leadId: true, lead: { select: { businessName: true, brand: true } } } } } }) : null;
+  const quote = quoteId ? await getDb().quote.findUnique({ where: { id: quoteId, lead: { brand } } }) : null;
   const customer = typeof charge.customer === "string" ? charge.customer : charge.customer?.id;
-  if (order && (order.mode !== mode || customer !== order.stripeCustomerId) || quote && quote.paymentMode !== mode || !order && !quote) throw new CommercialError("INVALID_ACTION");
+  if (order && (order.project.lead.brand !== brand || order.mode !== mode || customer !== order.stripeCustomerId) || quote && quote.paymentMode !== mode || !order && !quote) throw new CommercialError("INVALID_ACTION");
   const id = dispute?.id || "refund/" + charge.id;
   await getDb().$transaction(async tx => {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${id}))`;
@@ -43,6 +44,6 @@ export async function applyFinancialEvent(event: Stripe.Event) {
       const total = await tx.financialEvent.aggregate({ where: { siteOrderId: order.id, kind: "REFUND" }, _sum: { amountCents: true } });
       await tx.siteOrder.update({ where: { id: order.id }, data: { refundedCents: total._sum.amountCents || 0, ...(dispute ? { disputeStatus: latestDispute!.status } : {}) } });
     }
-    if (!previous || previous.status !== status || previous.amountCents !== data.amountCents) await queueOwnerNotification(tx, { siteOrderId: order?.id, quoteId: quote?.id, replyTo: "contact@zelyweb.com", key: `finance/${id}/${status}/${data.amountCents}`, mode, subject: dispute ? "Litige Stripe : état mis à jour" : "Remboursement Stripe : état mis à jour", text: `${order?.project.lead.businessName || quote?.number}\n${dispute ? "Litige" : "Remboursement"} : ${status}. Montant : ${(data.amountCents / 100).toFixed(2)} € TTC.\nConsultez Stripe pour toute intervention. Aucune suspension automatique du site.`, path: order ? `/projets/${order.projectId}#stripe` : `/clients/${quote!.leadId}` });
+    if (!previous || previous.status !== status || previous.amountCents !== data.amountCents) await queueOwnerNotification(tx, { brand, siteOrderId: order?.id, quoteId: quote?.id, replyTo: brand === "tadapo" ? "contact@tadapo.com" : "contact@zelyweb.com", key: `finance/${id}/${status}/${data.amountCents}`, mode, subject: dispute ? "Litige Stripe : état mis à jour" : "Remboursement Stripe : état mis à jour", text: `${order?.project.lead.businessName || quote?.number}\n${dispute ? "Litige" : "Remboursement"} : ${status}. Montant : ${(data.amountCents / 100).toFixed(2)} € TTC.\nConsultez Stripe pour toute intervention. Aucune suspension automatique du site.`, path: order ? `/projets/${order.projectId}#stripe` : `/clients/${quote!.leadId}` });
   }, { timeout: 20000 });
 }

@@ -1,5 +1,6 @@
+import { workspaceDb } from "./brand-context";
 import { requireWorkflowReady } from "./project-workflow";
-import { getDb, Prisma } from "@nova/database";
+import { Prisma } from "@nova/database";
 import { leadTransitions, leadStatusForStage, nextProjectStages, type LeadStatusCode, type ProjectStageCode } from "@nova/shared";
 import { z } from "zod";
 import { authenticate } from "./access";
@@ -24,7 +25,7 @@ const audit = (actorId: string, action: string, entity: { leadId?: string; proje
 export const adminService = {
   async dashboard(headers: Headers) {
     await authenticate(headers);
-    const db = getDb();
+    const db = workspaceDb(headers);
     const [leadGroups, projectGroups, latest] = await db.$transaction(async (tx) => Promise.all([
       tx.lead.groupBy({ where: { deletedAt: null }, by: ["status"], orderBy: { status: "asc" }, _count: { _all: true } }),
       tx.project.groupBy({ by: ["stage"], orderBy: { stage: "asc" }, _count: { _all: true } }),
@@ -51,15 +52,15 @@ export const adminService = {
       ...(query.q ? { OR: ["businessName", "fullName", "email", "businessSector", "services", "city"].map((field) =>
         ({ [field]: { contains: query.q, mode: "insensitive" } })) } : {}),
     };
-    const [total, rows, trashedTotal] = await getDb().$transaction([getDb().lead.count({ where }),
-      getDb().lead.findMany({ where, select: leadSelect, take: 20, skip: (query.page - 1) * 20,
+    const [total, rows, trashedTotal] = await workspaceDb(headers).$transaction([workspaceDb(headers).lead.count({ where }),
+      workspaceDb(headers).lead.findMany({ where, select: leadSelect, take: 20, skip: (query.page - 1) * 20,
         orderBy: [{ createdAt: query.sort }, { id: query.sort }] }),
-      getDb().lead.count({ where: { deletedAt: { not: null } } })]);
+      workspaceDb(headers).lead.count({ where: { deletedAt: { not: null } } })]);
     return { query, total, rows, trashedTotal, pages: Math.max(1, Math.ceil(total / 20)) };
   },
   async lead(headers: Headers, id: string) {
     await authenticate(headers);
-    return getDb().lead.findUnique({ where: { id: uuid.parse(id) }, include: {
+    return workspaceDb(headers).lead.findUnique({ where: { id: uuid.parse(id) }, include: {
       project: true, files: { select: { id: true, originalName: true, mimeType: true, sizeBytes: true } },
       conversation: { select: { id: true } }, _count: { select: { quotes: true } },
       internalNotes: { orderBy: { createdAt: "desc" }, take: 100, include: { author: { select: { user: { select: { name: true } } } } } },
@@ -69,7 +70,7 @@ export const adminService = {
   async setLeadDeleted(headers: Headers, input: unknown) {
     const actor = await authenticate(headers);
     const data = z.object({ id: uuid, expectedUpdatedAt: z.iso.datetime(), deleted: z.boolean(), confirmed: z.literal(true) }).parse(input);
-    await getDb().$transaction(async (tx) => {
+    await workspaceDb(headers).$transaction(async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${data.id}::uuid::text, 0))`;
       await tx.$queryRaw`SELECT "id" FROM "Lead" WHERE "id" = ${data.id}::uuid FOR UPDATE`;
       const lead = await tx.lead.findUnique({ where: { id: data.id }, include: {
@@ -84,7 +85,7 @@ export const adminService = {
   async changeLeadStatus(headers: Headers, input: unknown) {
     const actor = await authenticate(headers);
     const data = z.object({ id: uuid, expected: z.string(), status: z.string() }).parse(input);
-    await getDb().$transaction(async (tx) => {
+    await workspaceDb(headers).$transaction(async (tx) => {
       await tx.$queryRaw`SELECT "id" FROM "Lead" WHERE "id" = ${data.id}::uuid FOR UPDATE`;
       const lead = await tx.lead.findUnique({ where: { id: data.id }, include: { project: { select: { id: true } } } });
       if (!lead || lead.status !== data.expected) throw new BusinessError("STALE_STATUS");
@@ -99,12 +100,12 @@ export const adminService = {
     const actor = await authenticate(headers);
     const data = z.object({ id: uuid, kind: z.enum(["lead", "project"]), content: z.string().trim().min(2).max(5000) }).parse(input);
     const relation = data.kind === "lead" ? { leadId: data.id } : { projectId: data.id };
-    await getDb().$transaction(async (tx) => {
+    await workspaceDb(headers).$transaction(async (tx) => {
       if (data.kind === "lead") {
         await tx.$queryRaw`SELECT "id" FROM "Lead" WHERE "id" = ${data.id}::uuid FOR UPDATE`;
         const lead = await tx.lead.findUnique({ where: { id: data.id }, select: { deletedAt: true } });
         if (!lead || lead.deletedAt) throw new BusinessError("LEAD_IN_TRASH");
-      }
+      } else await tx.project.findUniqueOrThrow({ where: { id: data.id }, select: { id: true } });
       await tx.internalNote.create({ data: { ...relation, authorId: actor.id, content: data.content } });
       await tx.activityLog.create({ data: audit(actor.id, "NOTE_ADDED", relation) });
     });
@@ -112,7 +113,7 @@ export const adminService = {
   async convert(headers: Headers, id: string) {
     const actor = await authenticate(headers);
     uuid.parse(id);
-    return getDb().$transaction(async (tx) => {
+    return workspaceDb(headers).$transaction(async (tx) => {
       await tx.$queryRaw`SELECT "id" FROM "Lead" WHERE "id" = ${id}::uuid FOR UPDATE`;
       const existing = await tx.project.findUnique({ where: { leadId: id } });
       if (existing) return existing.id;
@@ -131,14 +132,14 @@ export const adminService = {
     if (query.status && !stages.includes(query.status)) throw new BusinessError("INVALID_FILTER");
     const where: Prisma.ProjectWhereInput = { ...(query.brand ? { AND: [{ lead: { brand: query.brand } }] } : {}), ...(query.status ? { stage: query.status as ProjectStageCode } : {}),
       ...(query.q ? { lead: { OR: ["businessName", "fullName", "email"].map((field) => ({ [field]: { contains: query.q, mode: "insensitive" } })) } } : {}) };
-    const [total, rows] = await getDb().$transaction([getDb().project.count({ where }), getDb().project.findMany({ where,
+    const [total, rows] = await workspaceDb(headers).$transaction([workspaceDb(headers).project.count({ where }), workspaceDb(headers).project.findMany({ where,
       include: { lead: { select: leadSelect } }, take: 20, skip: (query.page - 1) * 20,
       orderBy: [{ createdAt: query.sort }, { id: query.sort }] })]);
     return { query, total, rows, pages: Math.max(1, Math.ceil(total / 20)) };
   },
   async project(headers: Headers, id: string) {
     await authenticate(headers);
-    return getDb().project.findUnique({ where: { id: uuid.parse(id) }, include: { lead: { select: leadSelect },
+    return workspaceDb(headers).project.findUnique({ where: { id: uuid.parse(id) }, include: { lead: { select: leadSelect },
       notes: { take: 100, orderBy: { createdAt: "desc" }, include: { author: { select: { user: { select: { name: true } } } } } },
       activityLogs: { take: 100, orderBy: { createdAt: "desc" }, include: { actor: { select: { user: { select: { name: true } } } } } },
     } });
@@ -146,7 +147,7 @@ export const adminService = {
   async changeProjectStage(headers: Headers, input: unknown) {
     const actor = await authenticate(headers);
     const data = z.object({ id: uuid, expected: z.string(), stage: z.string() }).parse(input);
-    await getDb().$transaction(async (tx) => {
+    await workspaceDb(headers).$transaction(async (tx) => {
       await tx.$queryRaw`SELECT "id" FROM "Project" WHERE "id" = ${data.id}::uuid FOR UPDATE`;
       const project = await tx.project.findUnique({ where: { id: data.id } });
       if (project && await tx.tadapoOrder.findUnique({ where: { projectId: project.id } })) throw new BusinessError("TADAPO_WORKFLOW_REQUIRED");
@@ -168,11 +169,12 @@ export const adminService = {
   async projectLinks(headers: Headers, input: unknown) {
     const actor = await authenticate(headers);
     const data = z.object({ id: uuid, expectedUpdatedAt: z.iso.datetime(), previewUrl: urlSchema, websiteUrl: urlSchema }).parse(input);
-    await getDb().$transaction(async (tx) => {
+    await workspaceDb(headers).$transaction(async (tx) => {
       await tx.$queryRaw`SELECT "id" FROM "TadapoOrder" WHERE "projectId" = ${data.id}::uuid FOR UPDATE`;
       const tadapo = await tx.tadapoOrder.findUnique({ where: { projectId: data.id }, include: { project: true } });
       if (tadapo && tadapo.project?.previewUrl !== (data.previewUrl || null)) {
-        await tx.tadapoOrder.update({ where: { id: tadapo.id }, data: { reviewVersion: { increment: 1 }, approvedAt: null, approvedVersion: null, approvedName: null } });
+        // Once delivered, a new version must close its review and send the matching invitation atomically.
+        if(tadapo.firstVersionAt)throw new BusinessError("TADAPO_WORKFLOW_REQUIRED");
       }
       if (tadapo && tadapo.project?.websiteUrl !== (data.websiteUrl || null)) await tx.tadapoOrder.update({ where: { id: tadapo.id }, data: { domainReadyAt: null } });
       const count = await tx.project.updateMany({ where: { id: data.id, updatedAt: new Date(data.expectedUpdatedAt) },
