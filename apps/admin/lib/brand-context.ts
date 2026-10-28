@@ -11,7 +11,7 @@ export function brandFilter(model: string, brand: Brand): Record<string, unknown
   const project = { lead };
   const quote = { lead };
   switch (model) {
-    case "Lead": case "ServiceTemplate": case "MessageTemplate": return { brand };
+    case "Lead": case "ServiceTemplate": case "MessageTemplate": case "ManualPaymentReview": return { brand };
     case "Project": case "Conversation": case "Quote": return { lead };
     case "LeadFile": case "EmailVerificationToken": case "OutboxEvent": return { lead };
     case "ClientMessage": return { conversation: { lead } };

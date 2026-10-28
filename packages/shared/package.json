@@ -13,6 +13,7 @@
     "./business": "./business.ts",
     "./tadapo": "./tadapo.ts",
     "./tadapo-server": "./tadapo-server.ts",
+    "./tadapo-fulfillment": "./tadapo-fulfillment.ts",
     "./tadapo-mail": "./tadapo-mail.ts",
     "./tadapo-workflow": "./tadapo-workflow.ts",
     "./tadapo-domain": "./tadapo-domain.ts",

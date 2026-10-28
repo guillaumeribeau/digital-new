@@ -9,6 +9,7 @@ import { snapshotSchema } from "../../../../lib/commercial-core";
 import { deliveryStatuses, money, quoteStatuses } from "../../../../lib/commercial-shared";
 import { PageTitle, DetailFields, date } from "../../../../components/ui";
 import { CommercialForm } from "../../../../components/commercial-form";
+import { ManualPaymentPanel } from "../../../../components/manual-payment-panel";
 export default async function QuoteDetail({ params }: { params: Promise<{ id: string }> }) {
   await requireAdmin();
   const { id } = await params; if (!z.uuid().safeParse(id).success) notFound();
@@ -23,6 +24,7 @@ export default async function QuoteDetail({ params }: { params: Promise<{ id: st
       <section className="panel"><h2>Factures Stripe</h2>{invoices.length ? invoices.map(i => <p key={i.id}>{money(i.amountCents)} · {i.status} {i.hostedUrl && <a className="text-link" href={i.hostedUrl} target="_blank" rel="noreferrer">Consulter</a>} {i.pdfUrl && <a className="text-link" href={i.pdfUrl} target="_blank" rel="noreferrer">PDF</a>}</p>) : <p className="info-line">Les factures apparaissent après confirmation Stripe.</p>}</section><section className="panel"><h2>Paiements</h2>{quote.payments.length ? quote.payments.map((payment) => <article className="note" key={payment.id}><strong>{money(payment.amountCents)} · {payment.status === "SUCCEEDED" ? "Confirmé" : payment.status === "FAILED" ? "Échoué" : payment.status === "EXPIRED" ? "Expiré" : "En attente"}</strong><p>{payment.mode === "LIVE" ? "Paiement réel" : payment.mode === "TEST" ? "Stripe en mode test" : "Simulation locale — aucun débit bancaire"}</p><small>{date(payment.createdAt)}</small></article>) : <p className="info-line">Aucun paiement enregistré.</p>}</section></div>
       <div className="detail-stack"><section className="panel"><h2>Suivi du devis</h2><DetailFields rows={[["Numéro", quote.number], ["Statut", quoteStatuses[quote.status]], ["Accepté par", quote.acceptedName], ["Acceptation", quote.acceptedAt ? date(quote.acceptedAt) : null], ["Paiement", quote.paidAt ? date(quote.paidAt) : null]]} />
         {quote.paymentMode && quote.paymentMode !== "LIVE" && <p className="notice section-gap">Ce paiement est un test et ne correspond pas à un encaissement réel.</p>}
+        {["SENT", "ACCEPTED", "PAID", "COMPLETED"].includes(quote.status) && <ManualPaymentPanel id={id} kind="QUOTE" title="Vérifier le règlement manuellement" updatedAt={quote.updatedAt} paid={!!quote.paidAt} failed={!quote.paidAt && quote.payments[0]?.status === "FAILED"} mode={quote.paymentMode || quote.payments[0]?.mode || ""} />}
         {quote.status === "DRAFT" && issuerReady && <CommercialForm operation="send-quote" id={id} button="Envoyer le devis au client"><p className="info-line">Le client recevra le PDF et le lien privé pour accepter et payer. Le devis sera figé après l’envoi.</p></CommercialForm>}
         {["SENT", "ACCEPTED"].includes(quote.status) && <CommercialForm operation="remind" id={id} button="Relancer le client" />}
         {["DRAFT", "SENT", "DECLINED", "EXPIRED"].includes(quote.status) && <CommercialForm operation="cancel" id={id} button="Annuler ce devis" />}

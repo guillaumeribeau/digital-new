@@ -183,6 +183,26 @@ model AdminUser {
   user      User @relation(fields: [userId], references: [id], onDelete: Restrict)
   notes     InternalNote[]
   actions   ActivityLog[]
+  manualPaymentReviews ManualPaymentReview[]
+}
+
+model ManualPaymentReview {
+  id          String @id @default(uuid()) @db.Uuid
+  requestId   String @unique @db.Uuid
+  brand       String @db.VarChar(20)
+  kind        String @db.VarChar(30)
+  resourceId  String @db.Uuid
+  status      String @db.VarChar(10)
+  mode        String @db.VarChar(10)
+  paidAt      DateTime? @db.Timestamptz(3)
+  nextBillingAt DateTime? @db.Timestamptz(3)
+  reference   String @db.VarChar(200)
+  note        String @db.VarChar(2000)
+  actorId     String @db.Uuid
+  actor       AdminUser @relation(fields: [actorId], references: [id], onDelete: Restrict)
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([brand, resourceId, kind, createdAt])
 }
 
 model InternalNote {

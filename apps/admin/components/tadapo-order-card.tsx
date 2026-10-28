@@ -4,6 +4,7 @@ import { tadapoMoney, type TadapoOffer } from "@nova/shared/tadapo";
 import { tadapoClientLink } from "@nova/shared/tadapo-server";
 import { TadapoWorkflow } from "./tadapo-workflow";
 import { TadapoFiles } from "./tadapo-files";
+import { TadapoPaymentPanels } from "./tadapo-payment-panels";
 import { date, SafeUrl } from "./ui";
 const briefLabels: Record<string, string> = { plan: "Formule", term: "Engagement", company: "Entreprise", activity: "Activité", area: "Zone d’intervention", fullName: "Contact", email: "E-mail", phone: "Téléphone", objectives: "Objectifs", services: "Prestations", audience: "Clientèle", pages: "Pages souhaitées", existingWebsite: "Site actuel", style: "Ambiance", colors: "Couleurs", inspirations: "Inspirations", logo: "Logo", content: "Contenus disponibles", domainMode: "Situation du domaine", domain: "Domaine" };
 const briefValue = (key: string, value: string) => key === "term" ? value === "12" ? "12 mois" : "Sans engagement de durée" : key === "domainMode" ? ({ existing: "Domaine existant", new: "Nouveau domaine", help: "Conseil souhaité" } as Record<string, string>)[value] || value : value || "—";
@@ -18,6 +19,7 @@ export async function TadapoOrderCard({ projectId }: { projectId: string }) {
       <details><summary>Questionnaire complet et accord conservé</summary><dl className="details">{Object.entries(o.brief as Record<string, string>).map(([key, value]) => <div key={key}><dt>{briefLabels[key] || key}</dt><dd>{briefValue(key, value)}</dd></div>)}</dl><p>{consent.agreement}</p><p>Acceptation : {consent.acceptedAt} · Démarrage anticipé : {consent.earlyStart ? "demandé" : "non demandé"}.</p><p>Offre {offer.version} · Conditions {offer.termsVersion}</p></details>
       <h3>Factures</h3>{o.invoices.length ? o.invoices.map(i => <p key={i.id}>{tadapoMoney(i.amountCents, 2)} € TTC · {i.status} · <SafeUrl value={i.hostedUrl} /></p>) : <p>En attente de synchronisation Stripe.</p>}
     </section>
+    <TadapoPaymentPanels order={o} />
     <TadapoWorkflow id={o.id} />
     <section className="panel"><h2>Documents reçus par e-mail</h2><TadapoFiles id={o.id} />{o.files.map(f => <p key={f.id}><a className="text-link" href={`/api/admin/tadapo/files/${f.id}`}>{f.filename}</a> · {Math.round(f.sizeBytes / 1024)} Ko</p>)}</section>
   </>;

@@ -74,7 +74,8 @@ async function main() {
     await run(["--import", "tsx", "--test", "tests/integration/commercial.test.ts"], env);
     await run(["--import", "tsx", "--test", "tests/integration/site-billing.test.ts"], env);
     await run(["--import", "tsx", "--test", "tests/integration/tadapo.test.ts"], env);
-    if (process.argv.includes("--brands-ui") || process.argv.includes("--tadapo-ui") || process.argv.includes("--ui") || process.argv.includes("--commercial-ui") || process.argv.includes("--trash-ui") || process.argv.includes("--billing-ui") || process.argv.includes("--operations-ui")) {
+    await run(["--import", "tsx", "--test", "tests/integration/manual-payments.test.ts"], env);
+    if (process.argv.includes("--manual-payments-ui") || process.argv.includes("--brands-ui") || process.argv.includes("--tadapo-ui") || process.argv.includes("--ui") || process.argv.includes("--commercial-ui") || process.argv.includes("--trash-ui") || process.argv.includes("--billing-ui") || process.argv.includes("--operations-ui")) {
       const adminPort = await freePort(), websitePort = await freePort();
       const uiEnv: NodeJS.ProcessEnv & { BETTER_AUTH_URL: string; NEXT_PUBLIC_SITE_URL: string } = { ...env, BETTER_AUTH_URL: `http://127.0.0.1:${adminPort}`, NEXT_PUBLIC_SITE_URL: `http://127.0.0.1:${websitePort}`, NEXT_PUBLIC_GTM_ID: "", NEXT_TELEMETRY_DISABLED: "1" };
       Object.assign(uiEnv, { LEAD_EMAIL_MODE: "local", LOCAL_EMAIL_PREVIEW_TOKEN: randomBytes(32).toString("hex") });
@@ -90,7 +91,8 @@ async function main() {
         servers.push(spawn(process.execPath, ["node_modules/next/dist/bin/next", "dev", "apps/admin", "--hostname", "127.0.0.1", "--port", String(adminPort)], { env: nextEnv, windowsHide: true, stdio: "inherit" }));
         servers.push(spawn(process.execPath, ["node_modules/next/dist/bin/next", "dev", (process.argv.includes("--brands-ui") || process.argv.includes("--tadapo-ui")) ? "apps/tadapo" : "apps/website", "--hostname", "127.0.0.1", "--port", String(websitePort)], { env: nextEnv, windowsHide: true, stdio: "inherit" }));
         await Promise.all([ready(uiEnv.BETTER_AUTH_URL + "/connexion"), ready(uiEnv.NEXT_PUBLIC_SITE_URL + "/")]);
-        if (process.argv.includes("--brands-ui")) await run(["--import", "tsx", "scripts/check-brand-spaces-ui.ts"], uiEnv);
+        if (process.argv.includes("--manual-payments-ui")) await run(["--import", "tsx", "scripts/check-manual-payments-ui.ts"], uiEnv);
+        else if (process.argv.includes("--brands-ui")) await run(["--import", "tsx", "scripts/check-brand-spaces-ui.ts"], uiEnv);
         else if (process.argv.includes("--tadapo-ui")) await run(["--import", "tsx", "scripts/check-tadapo-admin-ui.ts"], uiEnv);
         else if (process.argv.includes("--billing-ui")) await run(["--import", "tsx", "scripts/check-site-billing-ui.ts"], uiEnv);
         else if (process.argv.includes("--operations-ui")) await run(["--import", "tsx", "scripts/check-operations-ui.ts"], uiEnv);

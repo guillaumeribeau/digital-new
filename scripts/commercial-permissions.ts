@@ -14,7 +14,7 @@ export async function grantCommercialPermissions(db: Client, admin: string, work
   await db.query(`GRANT SELECT (migration_name, checksum, finished_at, rolled_back_at) ON "_prisma_migrations" TO ${a}, ${w}`);
   await db.query(`GRANT SELECT, INSERT, UPDATE ON "SiteOrder", "BillingInvoice" TO ${a}`);
   await db.query(`GRANT SELECT, INSERT, UPDATE ON "CommercialSettings", "Quote", "PaymentAttempt", "CommercialEmail", "ServiceTemplate", "MessageTemplate" TO ${a}`);
-  await db.query(`GRANT SELECT, INSERT ON "ClientMessage", "Conversation", "QuoteAccess", "CommercialWebhook" TO ${a}`);
+  await db.query(`GRANT SELECT, INSERT ON "ClientMessage", "Conversation", "QuoteAccess", "CommercialWebhook", "ManualPaymentReview" TO ${a}`);
   await db.query(`GRANT UPDATE ("deliveryStatus", "providerId", "smtpMessageId") ON "ClientMessage" TO ${a}`);
   await db.query(`GRANT UPDATE ("needsReply", "updatedAt") ON "Conversation" TO ${a}`);
   await db.query(`GRANT UPDATE ("revokedAt") ON "QuoteAccess" TO ${a}`);

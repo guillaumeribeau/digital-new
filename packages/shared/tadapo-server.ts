@@ -4,6 +4,7 @@ import Stripe from "stripe";
 import { z } from "zod";
 import { getDb, Prisma, type TadapoOrder } from "@nova/database";
 import { tadapoBriefSchema } from "@nova/validation/tadapo";
+import { createTadapoProject } from "./tadapo-fulfillment";
 import { tadapoAgreement, tadapoAnniversary, tadapoOffer, tadapoOfferVersion, type TadapoOffer } from "./tadapo";
 import { seal, unseal } from "./secure-payload";
 import termsArchive from "./tadapo-terms-v6-2026-10-28.json";
@@ -159,14 +160,8 @@ export async function applyTadapoStripeEvent(event: Stripe.Event) {
       nextBillingAt: new Date(item.current_period_end * 1000), billingAlert: ["past_due", "unpaid", "incomplete", "incomplete_expired"].includes(sub.status),
       ...(sub.cancel_at ? { cancelEffectiveAt: new Date(sub.cancel_at * 1000) } : {}) };
     if (!o.paidAt && firstPaid) {
-      const brief = tadapoBriefSchema.parse(o.brief);
-      const lead = await tx.lead.create({ data: { brand: "tadapo", requestId: o.requestId, payloadHash: o.payloadHash, status: "PAID",
-        fullName: brief.fullName, email: brief.email.toLowerCase(), phone: brief.phone.slice(0, 25) || null,
-        preferredContactMethod: "email", businessName: brief.company, businessSector: brief.activity.slice(0, 100), city: brief.area,
-        services: brief.services.slice(0, 1500), preferredStyle: brief.style.slice(0, 50), projectDescription: brief.objectives,
-        pricingAcknowledgedAt: o.createdAt, privacyAcknowledgedAt: o.createdAt, pricingVersion: offer.version, privacyVersion: "2026-10-23", source: "tadapo-order" } });
-      const project = await tx.project.create({ data: { leadId: lead.id, stage: "CONTENT_PREPARATION", stripeCustomerId: update.stripeCustomerId } });
-      o = await tx.tadapoOrder.update({ where: { id: o.id }, data: { ...update, paidAt: start, projectId: project.id, stage: "CONTENT_PREPARATION",
+      const projectId = await createTadapoProject(tx, o, update.stripeCustomerId || null);
+      o = await tx.tadapoOrder.update({ where: { id: o.id }, data: { ...update, paidAt: start, projectId, stage: "CONTENT_PREPARATION",
         commitmentEndAt: offer.minimumMonths ? tadapoAnniversary(start, offer.minimumMonths) : null } });
       await queueTadapoEmail(tx, o, "TADAPO_PAYMENT", "Votre commande Tadapo est confirmée", tadapoPaymentMessage(o));
       await queueTadapoDomainInvite(tx, o);
