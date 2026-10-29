@@ -83,13 +83,35 @@ try {
     }
     for (const slug of ["courant", "studio-alba", "pollen"]) {
       const demo = await page.goto(`${base}/exemples/${slug}`, { waitUntil: "networkidle" });
+      await page.addStyleTag({ content: "nextjs-portal{display:none!important}" });
       assert.equal(demo.status(), 200); assert.equal(await page.locator("h1").count(), 1);
       assert.equal(await page.locator("meta[name=robots]").getAttribute("content"), "noindex, follow");
       await noOverflow(page, `${slug} ${width}`);
       const posts = []; page.on("request", request => { if (request.method() === "POST") posts.push(request.url()); });
+      assert.equal(await page.locator(".d-gallery-card").count(), 3);
+      for (const image of await page.locator(".d-photo img, .d-gallery-photo>img").all()) {
+        await image.scrollIntoViewIfNeeded();
+        await image.evaluate(image => image.decode());
+      }
+      const galleryTrigger = page.locator(".d-gallery-card").first();
+      await galleryTrigger.click();
+      const lightbox = page.getByRole("dialog");
+      await lightbox.waitFor();
+      const firstImage = await lightbox.locator(".d-lightbox-image img").getAttribute("src");
+      await page.keyboard.press("ArrowRight");
+      assert.notEqual(await lightbox.locator(".d-lightbox-image img").getAttribute("src"), firstImage);
+      await page.keyboard.press("ArrowLeft");
+      assert.equal(await lightbox.locator(".d-lightbox-image img").getAttribute("src"), firstImage);
+      await page.keyboard.press("Escape");
+      assert.equal(await page.getByRole("dialog").count(), 0);
+      assert.equal(await galleryTrigger.evaluate(element => element === document.activeElement), true);
       await page.getByRole("button", { name: "Essayer le formulaire" }).click();
       await page.getByRole("status").waitFor(); assert.deepEqual(posts, []);
-      if (width === 375 || width === 1440) await page.screenshot({ path: `reports/tadapo/${slug}-${width}.png`, fullPage: true });
+      if (width === 375 || width === 1440) {
+        await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
+        await page.screenshot({ path: `reports/tadapo/${slug}-${width}.png`, fullPage: true });
+        await page.screenshot({ path: `reports/tadapo/${slug}-hero-${width}.png` });
+      }
     }
     await page.goto(`${base}/commande?offre=business&engagement=monthly`, { waitUntil: "networkidle" });
     assert.ok((await page.locator(".order-plan").innerText()).includes("85"));
@@ -194,12 +216,17 @@ try {
   assert.equal(await page.getByRole("button", { name: /Commander et payer/ }).isDisabled(), true);
   await page.locator(".order-consent input").nth(0).check(); await page.locator(".order-consent input").nth(1).check();
   assert.equal(await page.getByRole("button", { name: /Commander et payer/ }).isEnabled(), true);
-  await page.route("**/api/orders", route => route.fulfill({ status: 503, json: { error: "Paiement temporairement indisponible." } }));
+  let checkoutPayload;
+  await page.route("**/api/orders", route => {
+    checkoutPayload = route.request().postDataJSON();
+    return route.fulfill({ status: 503, json: { error: "Paiement temporairement indisponible." } });
+  });
   await page.getByRole("button", { name: /Commander et payer/ }).click();
   await page.getByRole("alert").filter({ hasText: "Paiement temporairement indisponible" }).waitFor();
   await page.unroute("**/api/orders");
   await page.screenshot({ path: "reports/tadapo/order-finish.png", fullPage: true });
-  const api = await page.request.post(`${base}/api/orders`, { data: { requestId: crypto.randomUUID(), offerVersion: "tadapo-v4-2026-10-23", agreement: true, privacy: true, earlyStart: false, honeypot: "", brief }, headers: { origin: base } }); assert.equal(api.status(), 503);
+  assert.ok(checkoutPayload, "Le formulaire doit transmettre la version actuelle de l’offre");
+  const api = await page.request.post(`${base}/api/orders`, { data: checkoutPayload, headers: { origin: base } }); assert.equal(api.status(), 503);
   const injected = await page.request.post(`${base}/api/orders`, { data: { ...brief, price: 1 }, headers: { origin: base } }); assert.equal(injected.status(), 400);
   const cross = await page.request.post(`${base}/api/orders`, { data: brief, headers: { origin: "https://untrusted.example" } }); assert.equal(cross.status(), 403);
   const large = await page.request.post(`${base}/api/orders`, { data: { ...brief, content: "x".repeat(25000) }, headers: { origin: base } }); assert.equal(large.status(), 413);

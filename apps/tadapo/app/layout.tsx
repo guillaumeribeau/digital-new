@@ -6,6 +6,7 @@ import "../styles/commercial.css";
 import "../styles/legal.css";
 import "../styles/how.css";
 import "../styles/animation.css";
+import "../styles/demo-previews.css";
 const display = Bricolage_Grotesque({ subsets: ["latin"], variable: "--font-tadapo-display", display: "swap" });
 const body = DM_Sans({ subsets: ["latin"], variable: "--font-tadapo-body", display: "swap" });
 export const metadata: Metadata = {

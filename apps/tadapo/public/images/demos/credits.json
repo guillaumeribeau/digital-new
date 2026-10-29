@@ -1,0 +1,58 @@
+[
+  {
+    "id": "living-room",
+    "src": "/images/demos/living-room.webp",
+    "photographer": "Curtis Adams",
+    "credit": "https://www.pexels.com/photo/cozy-minimalist-living-room-with-armchairs-36777597/",
+    "license": "https://www.pexels.com/license/",
+    "sourceFile": "/examples/bien-etre/detail.jpg"
+  },
+  {
+    "id": "bathroom",
+    "src": "/images/demos/bathroom.webp",
+    "photographer": "Max Vakhtbovych",
+    "credit": "https://www.pexels.com/photo/interior-of-a-modern-bathroom-8146148/",
+    "license": "https://www.pexels.com/license/",
+    "sourceFile": "/examples/plombier/hero.jpg"
+  },
+  {
+    "id": "workspace",
+    "src": "/images/demos/workspace.webp",
+    "photographer": "Mike van Schoonderwalt",
+    "credit": "https://www.pexels.com/photo/interior-design-of-a-modern-business-office-5511119/",
+    "license": "https://www.pexels.com/license/",
+    "sourceFile": "/examples/conseil/hero.jpg"
+  },
+  {
+    "id": "meeting-room",
+    "src": "/images/demos/meeting-room.webp",
+    "photographer": "Paul Seling",
+    "credit": "https://www.pexels.com/photo/furniture-in-a-minimalist-conference-room-20390772/",
+    "license": "https://www.pexels.com/license/",
+    "sourceFile": "/examples/conseil/detail.jpg"
+  },
+  {
+    "id": "house",
+    "src": "/images/demos/house.webp",
+    "photographer": "Binyamin Mellish",
+    "credit": "https://www.pexels.com/photo/106399/",
+    "license": "https://www.pexels.com/license/",
+    "sourceFile": "/examples/immobilier/hero.jpg"
+  },
+  {
+    "id": "dish",
+    "src": "/images/demos/dish.webp",
+    "photographer": "Valeria Boltneva",
+    "credit": "https://www.pexels.com/photo/appetizing-plated-gourmet-meal-presentation-30335685/",
+    "license": "https://www.pexels.com/license/",
+    "sourceFile": "/examples/restaurant/detail.jpg"
+  },
+  {
+    "id": "terrace",
+    "src": "/images/demos/terrace.webp",
+    "photographer": "Äan Thy Nguyá»…n Mai",
+    "credit": "https://www.pexels.com/photo/outdoor-garden-patio-with-wooden-furniture-32774621/",
+    "license": "https://www.pexels.com/license/",
+    "sourceFile": "/examples/paysagiste/detail.jpg"
+  }
+]
